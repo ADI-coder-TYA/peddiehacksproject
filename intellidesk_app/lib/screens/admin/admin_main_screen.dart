@@ -301,7 +301,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                           ],
                         ),
                         Text(
-                          'IntelliDesk / $currentTitle',
+                          'MedAccess AI / $currentTitle',
                           overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.outfit(
                             color: const Color(0xFF64748B),

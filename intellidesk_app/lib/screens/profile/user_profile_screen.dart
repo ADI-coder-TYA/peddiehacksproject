@@ -467,7 +467,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   onPressed: () => _confirmSignOut(context),
                   icon: const Icon(Icons.logout, color: Color(0xFFDC2626), size: 18),
                   label: Text(
-                    'Sign Out of IntelliDesk',
+                    'Sign Out of MedAccess AI',
                     style: GoogleFonts.outfit(
                       color: const Color(0xFFDC2626),
                       fontWeight: FontWeight.bold,
