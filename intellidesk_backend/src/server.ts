@@ -19,6 +19,7 @@ import { loadOrTrainAnomalyModel } from './services/anomalyModel.js';
 import { startWorkers } from './workers/index.js';
 
 import { ensureStorageBucketsExist } from './services/storageBootstrap.js';
+import { DatabaseService } from './services/dbService.js';
 
 import authRouter from './routes/auth.js';
 import { requireAuth, requireRole } from './middleware/authMiddleware.js';
@@ -43,8 +44,13 @@ app.use('/api/v1/reports', requireAuth, requireRole(['ADMIN']), tenantScopeMiddl
 app.use('/api/v1/workflow', requireAuth, requireRole(['ADMIN']), tenantScopeMiddleware, workflowDispatchRouter);
 app.use('/api/v1/simulation', requireAuth, requireRole(['ADMIN']), tenantScopeMiddleware, simulationRouter);
 
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+app.get('/health', async (req, res) => {
+  const dbHealth = await DatabaseService.checkDatabaseHealth();
+  res.status(200).json({
+    status: 'ok',
+    service: 'MedAccess AI Clinical Triage & Copay Engine',
+    database: dbHealth,
+  });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -53,7 +59,15 @@ async function bootstrapServer() {
   // 1. Ensure storage buckets exist
   await ensureStorageBucketsExist();
 
-  // 2. Load ML Models
+  // 2. Verify Database Layer & Schema Telemetry
+  try {
+    const dbHealth = await DatabaseService.checkDatabaseHealth();
+    console.log(`🩺 [MedAccess AI] Database Telemetry: status=${dbHealth.status} | Claims ready=${dbHealth.claimsReady} | Health Funds ready=${dbHealth.fundsReady}`);
+  } catch (dbErr) {
+    console.warn('⚠️ [MedAccess AI] Database health check warning:', dbErr);
+  }
+
+  // 3. Load ML Models
   try {
     await Promise.all([
       loadOrTrainLSTMModel(),
@@ -65,7 +79,7 @@ async function bootstrapServer() {
     console.error('Failed to initialize ML models on startup:', err);
   }
 
-  // 3. Start HTTP server and background workers
+  // 4. Start HTTP server and background workers
   server.listen(PORT as number, '0.0.0.0', () => {
     console.log(`🏥 [MedAccess AI] Clinical Triage & Emergency Copay Engine running on port ${PORT}`);
     startWorkers();
@@ -73,3 +87,4 @@ async function bootstrapServer() {
 }
 
 bootstrapServer();
+
