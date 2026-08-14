@@ -1,11 +1,10 @@
-import 'dart:io' show File;
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/boutique_background.dart';
 import '../../widgets/glass_card.dart';
 
@@ -19,26 +18,27 @@ class AdminSignupScreen extends StatefulWidget {
 class _AdminSignupScreenState extends State<AdminSignupScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _instituteNameCtrl = TextEditingController(text: 'Stanford University');
-  final TextEditingController _adminNameCtrl = TextEditingController(text: 'Dr. Sarah Chen');
-  final TextEditingController _adminEmailCtrl = TextEditingController(text: 'admin@stanford.edu');
+  final TextEditingController _instituteNameCtrl = TextEditingController(text: 'Stanford Medical Center & Campus Health');
+  final TextEditingController _adminNameCtrl = TextEditingController(text: 'Dr. Sarah Chen, MD');
+  final TextEditingController _adminEmailCtrl = TextEditingController(text: 'admin@stanfordhealth.edu');
   final TextEditingController _passwordCtrl = TextEditingController(text: 'admin123');
-  final TextEditingController _instCodeCtrl = TextEditingController(text: 'inst-stanford-01');
-  final TextEditingController _defaultStudentPasswordCtrl = TextEditingController(text: 'Student@123');
+  final TextEditingController _instCodeCtrl = TextEditingController(text: 'hosp-stanford-01');
+  final TextEditingController _defaultStudentPasswordCtrl = TextEditingController(text: 'Patient@123');
+  final TextEditingController _fundPoolCtrl = TextEditingController(text: '150000');
 
   final TextEditingController _csvRawCtrl = TextEditingController();
   List<Map<String, String>> _parsedStudents = [];
   String? _csvFileName;
 
-  static const String sampleCsvTemplate = '''id,institution_id,phone,name,email,created_at
-STU-2026-001,edu-admin-123,+15550000001,Alex Johnson,alex@university.edu,2026-01-01T00:00:00Z
-STU-2026-002,edu-admin-123,+15550000002,Jordan Miller,jordan@university.edu,2026-01-01T00:00:00Z
-STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-01-01T00:00:00Z''';
+  static const String sampleCsvTemplate = '''id,institution_id,phone,name,email,emergency_contact
+PAT-2026-001,hosp-stanford-01,+91 98765 43210,Alex Rivera,alex.rivera@campushealth.edu,+91 98765 43211
+PAT-2026-002,hosp-stanford-01,+91 98111 22334,Jordan Miller,jordan.miller@campushealth.edu,+91 98111 22335
+PAT-2026-003,hosp-stanford-01,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+91 99223 34456''';
 
   @override
   void initState() {
     super.initState();
-    // Load sample CSV data by default for smooth demo testing
+    // Load sample patient CSV data by default
     _csvRawCtrl.text = sampleCsvTemplate;
     _parseCsvText(sampleCsvTemplate);
   }
@@ -51,6 +51,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
     _passwordCtrl.dispose();
     _instCodeCtrl.dispose();
     _defaultStudentPasswordCtrl.dispose();
+    _fundPoolCtrl.dispose();
     _csvRawCtrl.dispose();
     super.dispose();
   }
@@ -68,17 +69,14 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
 
     final List<Map<String, String>> roster = [];
     final header = lines.first.toLowerCase().split(',').map((h) => h.trim()).toList();
-    final hasHeader = header.any((h) => ['id', 'student_id', 'email', 'name', 'first_name', 'last_name', 'phone', 'institution_id', 'department'].contains(h));
+    final hasHeader = header.any((h) => ['id', 'patient_id', 'student_id', 'email', 'name', 'full_name', 'phone', 'emergency_contact', 'institution_id'].contains(h));
     final dataLines = hasHeader ? lines.sublist(1) : lines;
 
-    int idIdx = header.indexWhere((h) => h == 'id' || h == 'student_id' || h == 'studentid');
-    int instIdx = header.indexWhere((h) => h == 'institution_id' || h == 'institutionid');
+    int idIdx = header.indexWhere((h) => h == 'id' || h == 'patient_id' || h == 'student_id');
     int phoneIdx = header.indexWhere((h) => h == 'phone' || h == 'phone_number' || h == 'contact');
-    int nameIdx = header.indexWhere((h) => h == 'name' || h == 'student_name' || h == 'full_name');
-    int firstNameIdx = header.indexWhere((h) => h == 'first_name' || h == 'firstname');
-    int lastNameIdx = header.indexWhere((h) => h == 'last_name' || h == 'lastname');
-    int emailIdx = header.indexWhere((h) => h == 'email' || h == 'student_email');
-    int deptIdx = header.indexWhere((h) => h == 'department' || h == 'branch' || h == 'dept' || h == 'major' || h == 'stream' || h == 'course');
+    int nameIdx = header.indexWhere((h) => h == 'name' || h == 'patient_name' || h == 'full_name');
+    int emailIdx = header.indexWhere((h) => h == 'email' || h == 'patient_email');
+    int emergencyIdx = header.indexWhere((h) => h == 'emergency_contact' || h == 'emergency');
 
     if (!hasHeader) {
       idIdx = 0;
@@ -91,35 +89,25 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
       final parts = dataLines[i].split(',').map((p) => p.trim()).toList();
       if (parts.isEmpty || (parts.length == 1 && parts[0].isEmpty)) continue;
 
-      final studentId = idIdx >= 0 && idIdx < parts.length && parts[idIdx].isNotEmpty ? parts[idIdx] : 'STU-${1000 + i + 1}';
-      final email = emailIdx >= 0 && emailIdx < parts.length && parts[emailIdx].isNotEmpty ? parts[emailIdx] : (parts.length > 1 ? parts[1] : 'student_${i + 1}@university.edu');
+      final studentId = idIdx >= 0 && idIdx < parts.length && parts[idIdx].isNotEmpty ? parts[idIdx] : 'PAT-${1000 + i + 1}';
+      final email = emailIdx >= 0 && emailIdx < parts.length && parts[emailIdx].isNotEmpty ? parts[emailIdx] : (parts.length > 1 ? parts[1] : 'patient_${i + 1}@campushealth.edu');
       final phone = phoneIdx >= 0 && phoneIdx < parts.length ? parts[phoneIdx] : '';
       
       String name = '';
       if (nameIdx >= 0 && nameIdx < parts.length && parts[nameIdx].isNotEmpty) {
         name = parts[nameIdx];
-      } else if (firstNameIdx >= 0 && firstNameIdx < parts.length) {
-        final first = parts[firstNameIdx];
-        final last = lastNameIdx >= 0 && lastNameIdx < parts.length ? parts[lastNameIdx] : '';
-        name = '$first $last'.trim();
-      }
-      if (name.isEmpty) {
-        name = email.contains('@') ? email.split('@')[0].replaceAll('.', ' ') : 'Student ${i + 1}';
+      } else {
+        name = 'Patient ${i + 1}';
       }
 
-      final instId = instIdx >= 0 && instIdx < parts.length ? parts[instIdx] : _instCodeCtrl.text.trim();
-      final dept = deptIdx >= 0 && deptIdx < parts.length ? parts[deptIdx] : 'General Academics';
+      final emergency = emergencyIdx >= 0 && emergencyIdx < parts.length ? parts[emergencyIdx] : '';
 
       roster.add({
-        'student_id': studentId,
         'studentId': studentId,
-        'id': studentId,
-        'name': name,
         'email': email,
         'phone': phone,
-        'branch': dept,
-        'department': dept,
-        'institution_id': instId,
+        'name': name,
+        'emergency': emergency,
       });
     }
 
@@ -143,56 +131,48 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
         });
 
         String content = '';
-        if (file.bytes != null && file.bytes!.isNotEmpty) {
+        if (file.bytes != null) {
           content = utf8.decode(file.bytes!);
-        } else if (file.path != null && !kIsWeb) {
-          final ioFile = File(file.path!);
-          if (await ioFile.exists()) {
-            content = await ioFile.readAsString();
-          }
         }
 
-        if (content.trim().isNotEmpty) {
+        if (content.isNotEmpty) {
           _csvRawCtrl.text = content;
           _parseCsvText(content);
         }
       }
     } catch (e) {
-      debugPrint('CSV pick error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading CSV: $e')),
+        );
+      }
     }
   }
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_parsedStudents.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please upload or paste a valid student CSV roster before submitting.'),
-          backgroundColor: Colors.orangeAccent,
-        ),
-      );
-      return;
-    }
 
     final auth = context.read<AuthProvider>();
-    final success = await auth.registerInstitution(
+
+    final success = await auth.signupAdminWithRoster(
       instituteName: _instituteNameCtrl.text.trim(),
       adminName: _adminNameCtrl.text.trim(),
       adminEmail: _adminEmailCtrl.text.trim(),
-      password: _passwordCtrl.text,
+      password: _passwordCtrl.text.trim(),
+      institutionCode: _instCodeCtrl.text.trim(),
       defaultStudentPassword: _defaultStudentPasswordCtrl.text.trim(),
-      institutionId: _instCodeCtrl.text.trim(),
-      students: _parsedStudents.cast<Map<String, dynamic>>(),
-      csvContent: _csvRawCtrl.text,
+      rosterStudents: _parsedStudents,
     );
 
-    if (success && mounted) {
+    if (!mounted) return;
+
+    if (success) {
       _showSuccessDialog();
-    } else if (mounted) {
+    } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(auth.errorMessage ?? 'Registration failed'),
-          backgroundColor: Colors.redAccent,
+          content: Text(auth.errorMessage ?? 'Onboarding failed. Please retry.'),
+          backgroundColor: AppTheme.emergencyRed,
         ),
       );
     }
@@ -203,12 +183,24 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
-          children: const [
-            Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 28),
-            SizedBox(width: 10),
-            Text('Institution Registered!'),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFCCFBF1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.check_circle, color: AppTheme.primaryBrand, size: 28),
+            ),
+            const SizedBox(width: 12),
+            Flexible(
+              child: Text(
+                'Healthcare Facility Provisioned!',
+                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -216,20 +208,25 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${_instituteNameCtrl.text} (${_instCodeCtrl.text}) has been successfully created.',
-              style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1F1B2C)),
+              '${_instituteNameCtrl.text.trim()} successfully registered on MedAccess AI.',
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
             ),
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
+                color: AppTheme.surfaceSlate,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.4)),
+                border: Border.all(color: AppTheme.borderSubtle),
               ),
-              child: Text(
-                '🎉 ${_parsedStudents.length} Students imported & provisioned successfully!\n\nAll imported students can now sign in using their email or Student ID.',
-                style: const TextStyle(color: Color(0xFF15803D), fontSize: 13, height: 1.4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('• Facility ID: ${_instCodeCtrl.text.trim()}', style: const TextStyle(fontSize: 12)),
+                  Text('• Clinical Admin: ${_adminEmailCtrl.text.trim()}', style: const TextStyle(fontSize: 12)),
+                  Text('• Provisioned Patients: ${_parsedStudents.length}', style: const TextStyle(fontSize: 12)),
+                  Text('• Health Fund Pool: ₹${_fundPoolCtrl.text.trim()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryBrand)),
+                ],
               ),
             ),
           ],
@@ -238,14 +235,14 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
           ElevatedButton(
             onPressed: () {
               Navigator.of(ctx).pop();
-              Navigator.of(context).pop(); // Back to main portal
+              Navigator.of(context).pop();
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF1F1B2C),
+              backgroundColor: AppTheme.primaryBrand,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Enter Administrator Command Dashboard'),
+            child: const Text('Enter Clinical War Room'),
           ),
         ],
       ),
@@ -258,7 +255,12 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Institute Sign Up & Student Roster Import', style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16)),
+        backgroundColor: AppTheme.primaryBrand,
+        foregroundColor: Colors.white,
+        title: Text(
+          'Healthcare Facility & Patient Onboarding',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
@@ -285,10 +287,10 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                                color: AppTheme.primaryBrand.withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                               ),
-                              child: const Icon(Icons.domain_add, color: Color(0xFF8B5CF6), size: 28),
+                              child: const Icon(Icons.local_hospital, color: AppTheme.primaryBrand, size: 28),
                             ),
                             const SizedBox(width: 14),
                             Expanded(
@@ -296,15 +298,15 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Institution Setup & Batch Provisioning',
+                                    'Healthcare Facility Provisioning',
                                     style: GoogleFonts.outfit(
                                       fontSize: 20,
                                       fontWeight: FontWeight.bold,
-                                      color: const Color(0xFF1F1B2C),
+                                      color: const Color(0xFF0F172A),
                                     ),
                                   ),
                                   Text(
-                                    'Register your institute and import student CSV roster for instant login',
+                                    'Register your hospital/clinic and import patient CSV roster for instant emergency access',
                                     style: GoogleFonts.outfit(
                                       fontSize: 12,
                                       color: const Color(0xFF64748B),
@@ -319,8 +321,13 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
 
                         // Section 1: Institution & Admin Info
                         Text(
-                          '1. INSTITUTE & ADMIN CREDENTIALS',
-                          style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6), letterSpacing: 0.5),
+                          '1. HEALTHCARE FACILITY & CLINICAL ADMIN CREDENTIALS',
+                          style: GoogleFonts.outfit(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.primaryBrand,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         LayoutBuilder(
@@ -331,32 +338,39 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                 children: [
                                   TextFormField(
                                     controller: _instituteNameCtrl,
-                                    decoration: _buildInputDeco('Institute Name', Icons.account_balance),
+                                    decoration: _buildInputDeco('Healthcare Facility Name', Icons.local_hospital_outlined),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _instCodeCtrl,
-                                    decoration: _buildInputDeco('Institution Code / ID', Icons.tag),
+                                    decoration: _buildInputDeco('Facility Code / ID', Icons.tag),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _adminNameCtrl,
-                                    decoration: _buildInputDeco('Admin Full Name', Icons.person_outline),
+                                    decoration: _buildInputDeco('Chief Medical Officer / Admin Name', Icons.person_outline),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _adminEmailCtrl,
                                     keyboardType: TextInputType.emailAddress,
-                                    decoration: _buildInputDeco('Admin Official Email', Icons.email_outlined),
+                                    decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _defaultStudentPasswordCtrl,
-                                    decoration: _buildInputDeco('Default Student Password (for CSV roster)', Icons.key),
+                                    decoration: _buildInputDeco('Default Patient Password (for CSV roster)', Icons.key),
+                                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextFormField(
+                                    controller: _fundPoolCtrl,
+                                    keyboardType: TextInputType.number,
+                                    decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                 ],
@@ -369,7 +383,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                     Expanded(
                                       child: TextFormField(
                                         controller: _instituteNameCtrl,
-                                        decoration: _buildInputDeco('Institute Name', Icons.account_balance),
+                                        decoration: _buildInputDeco('Healthcare Facility Name', Icons.local_hospital_outlined),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -377,7 +391,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                     Expanded(
                                       child: TextFormField(
                                         controller: _instCodeCtrl,
-                                        decoration: _buildInputDeco('Institution Code / ID', Icons.tag),
+                                        decoration: _buildInputDeco('Facility Code / ID', Icons.tag),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -389,7 +403,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                     Expanded(
                                       child: TextFormField(
                                         controller: _adminNameCtrl,
-                                        decoration: _buildInputDeco('Admin Full Name', Icons.person_outline),
+                                        decoration: _buildInputDeco('CMO / Admin Full Name', Icons.person_outline),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -398,17 +412,32 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                       child: TextFormField(
                                         controller: _adminEmailCtrl,
                                         keyboardType: TextInputType.emailAddress,
-                                        decoration: _buildInputDeco('Admin Official Email', Icons.email_outlined),
+                                        decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
-                                TextFormField(
-                                  controller: _defaultStudentPasswordCtrl,
-                                  decoration: _buildInputDeco('Default Student Password (assigned to all CSV provisioned students)', Icons.key),
-                                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _defaultStudentPasswordCtrl,
+                                        decoration: _buildInputDeco('Default Patient Password', Icons.key),
+                                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _fundPoolCtrl,
+                                        keyboardType: TextInputType.number,
+                                        decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined),
+                                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             );
@@ -422,8 +451,13 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                           children: [
                             Expanded(
                               child: Text(
-                                '2. IMPORT STUDENT ROSTER (CSV)',
-                                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF8B5CF6), letterSpacing: 0.5),
+                                '2. IMPORT PATIENT ROSTER (CSV)',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.primaryBrand,
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ),
                             TextButton.icon(
@@ -431,8 +465,8 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                 _csvRawCtrl.text = sampleCsvTemplate;
                                 _parseCsvText(sampleCsvTemplate);
                               },
-                              icon: const Icon(Icons.file_download_outlined, size: 14),
-                              label: const Text('Load Sample CSV', style: TextStyle(fontSize: 11)),
+                              icon: const Icon(Icons.file_download_outlined, size: 14, color: AppTheme.primaryBrand),
+                              label: const Text('Load Sample CSV', style: TextStyle(fontSize: 11, color: AppTheme.primaryBrand)),
                             ),
                           ],
                         ),
@@ -444,14 +478,14 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                             Expanded(
                               child: OutlinedButton.icon(
                                 onPressed: _pickCsvFile,
-                                icon: const Icon(Icons.upload_file, color: Color(0xFFEE4D9F)),
+                                icon: const Icon(Icons.upload_file, color: AppTheme.primaryBrand),
                                 label: Text(
-                                  _csvFileName != null ? 'File: $_csvFileName' : 'Upload CSV File (FilePicker)',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  _csvFileName != null ? 'File: $_csvFileName' : 'Upload Patient CSV (FilePicker)',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryBrand),
                                 ),
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 14),
-                                  side: const BorderSide(color: Color(0xFFEE4D9F), width: 1.5),
+                                  side: const BorderSide(color: AppTheme.primaryBrand, width: 1.5),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                                 ),
                               ),
@@ -466,7 +500,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                           maxLines: 4,
                           style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
                           decoration: InputDecoration(
-                            hintText: 'Paste CSV content here (student_id, email, phone)',
+                            hintText: 'Paste CSV content (patient_id, name, email, phone, emergency_contact)',
                             filled: true,
                             fillColor: Colors.white.withValues(alpha: 0.8),
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
@@ -481,19 +515,24 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                           children: [
                             Expanded(
                               child: Text(
-                                'PARSED STUDENT ROSTER PREVIEW',
-                                style: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF64748B), letterSpacing: 0.5),
+                                'PARSED PATIENT ROSTER PREVIEW',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFF64748B),
+                                  letterSpacing: 0.5,
+                                ),
                               ),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEE4D9F).withValues(alpha: 0.12),
+                                color: const Color(0xFFCCFBF1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Text(
-                                '${_parsedStudents.length} Students Ready',
-                                style: GoogleFonts.outfit(color: const Color(0xFFEE4D9F), fontWeight: FontWeight.bold, fontSize: 12),
+                                '${_parsedStudents.length} Patients Ready',
+                                style: GoogleFonts.outfit(color: AppTheme.primaryBrand, fontWeight: FontWeight.bold, fontSize: 12),
                               ),
                             ),
                           ],
@@ -513,7 +552,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                 ? const Center(
                                     child: Padding(
                                       padding: EdgeInsets.all(24),
-                                      child: Text('No students parsed. Upload or paste CSV above.', style: TextStyle(color: Color(0xFF94A3B8))),
+                                      child: Text('No patients parsed. Upload or paste CSV above.', style: TextStyle(color: Color(0xFF94A3B8))),
                                     ),
                                   )
                                 : ListView.separated(
@@ -526,8 +565,8 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                         dense: true,
                                         leading: CircleAvatar(
                                           radius: 12,
-                                          backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
-                                          child: Text('${idx + 1}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF8B5CF6))),
+                                          backgroundColor: AppTheme.primaryBrand.withValues(alpha: 0.15),
+                                          child: Text('${idx + 1}', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.primaryBrand)),
                                         ),
                                         title: Text(
                                           s['name'] ?? '',
@@ -546,7 +585,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                             borderRadius: BorderRadius.circular(6),
                                           ),
                                           child: Text(
-                                            s['phone']?.isNotEmpty == true ? s['phone']! : (s['department'] ?? 'Valid'),
+                                            s['phone']?.isNotEmpty == true ? s['phone']! : 'Verified',
                                             style: const TextStyle(color: Color(0xFF15803D), fontSize: 10, fontWeight: FontWeight.bold),
                                           ),
                                         ),
@@ -563,7 +602,7 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                           child: ElevatedButton(
                             onPressed: auth.isLoading ? null : _handleRegister,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF1F1B2C),
+                              backgroundColor: AppTheme.primaryBrand,
                               foregroundColor: Colors.white,
                               elevation: 2,
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -574,14 +613,14 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
                                     height: 24,
                                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                                   )
-                                : Row(
+                                : const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    children: const [
-                                      Icon(Icons.how_to_reg, size: 20),
+                                    children: [
+                                      Icon(Icons.health_and_safety, size: 20),
                                       SizedBox(width: 8),
                                       Flexible(
                                         child: Text(
-                                          'Register Institute & Provision Students',
+                                          'Provision Healthcare Facility & Patient Roster',
                                           overflow: TextOverflow.ellipsis,
                                           maxLines: 1,
                                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
@@ -606,11 +645,14 @@ STU-2026-003,edu-admin-123,+15550000003,Taylor Swift,taylor@university.edu,2026-
   InputDecoration _buildInputDeco(String label, IconData icon) {
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: const Color(0xFF8B5CF6), size: 18),
+      labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+      prefixIcon: Icon(icon, color: AppTheme.primaryBrand, size: 20),
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.8),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFF8B5CF6), width: 1.5)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0x1A1F1B2C))),
+      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0x1A1F1B2C))),
+      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppTheme.primaryBrand, width: 1.5)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );
   }
 }
