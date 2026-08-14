@@ -8,7 +8,8 @@ export const redisConnection = new Redis(redisUrl, {
 });
 
 // Define Queue Names
-export const INTAKE_QUEUE_NAME = 'intake-processing-queue';
+export const CLINICAL_INTAKE_QUEUE_NAME = 'clinical-intake-queue';
+export const INTAKE_QUEUE_NAME = CLINICAL_INTAKE_QUEUE_NAME;
 export const NOTIFICATION_QUEUE_NAME = 'notification-dispatch-queue';
 export const ML_RETRAINING_QUEUE_NAME = 'ml-retraining-queue';
 export const DEAD_LETTER_QUEUE_NAME = 'dead-letter-queue';

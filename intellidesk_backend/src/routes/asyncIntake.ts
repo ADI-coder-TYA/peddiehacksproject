@@ -162,30 +162,55 @@ asyncIntakeRouter.post('/web', checkBackpressure, tenantScopeMiddleware, upload.
       : await classifyCategoryDynamic(fullMessage);
     const initialUrgency = lifeSafety.isLifeSafetyCritical ? 'Critical' : 'Routine';
 
-    const { data: ticket, error: insertError } = await supabase.from('tickets').insert([{
-      institution_id: institutionId,
-      student_phone: parsedData.studentContact || 'web-client',
-      raw_message: fullMessage,
-      media_url: mediaUrl,
-      parsed_category: initialCategory,
-      urgency_level: initialUrgency,
-      status: 'Pending'
-    }]).select().single();
+    let claimId: string = '';
+    
+    try {
+      const { data: claimRow, error: claimErr } = await supabase.from('claims').insert([{
+        institution_id: institutionId,
+        patient_phone: parsedData.studentContact || 'web-client',
+        description: fullMessage,
+        receipt_url: mediaUrl,
+        clinical_category: initialCategory,
+        esi_level: lifeSafety.isLifeSafetyCritical ? 'ESI_1_CRITICAL' : 'ROUTINE',
+        status: 'Submitted'
+      }]).select().single();
 
-    if (insertError) {
-      throw new Error(`Failed to create ticket: ${insertError.message}`);
-    }
+      if (!claimErr && claimRow) {
+        claimId = claimRow.id;
+      }
+    } catch (_) {}
 
-    const ticketId = ticket.id;
+    // Synchronize to tickets table for backward compatibility
+    let ticketId: string = claimId;
+    try {
+      const { data: ticket, error: insertError } = await supabase.from('tickets').insert([{
+        id: claimId || undefined,
+        institution_id: institutionId,
+        student_phone: parsedData.studentContact || 'web-client',
+        raw_message: fullMessage,
+        media_url: mediaUrl,
+        parsed_category: initialCategory,
+        urgency_level: initialUrgency,
+        status: 'Pending'
+      }]).select().single();
+
+      if (ticket) {
+        ticketId = ticket.id;
+        if (!claimId) claimId = ticket.id;
+      }
+    } catch (_) {}
 
     const job = await intakeQueue.add('process-web-intake', {
+      claimId,
       ticketId,
       rawMessage: fullMessage,
+      description: fullMessage,
       mediaUrl,
       media_url: mediaUrl,
       attachmentUrl: mediaUrl,
       studentName: parsedData.studentName || 'Anonymous',
       studentPhone: parsedData.studentContact || 'web-client',
+      patientPhone: parsedData.studentContact || 'web-client',
       institutionId,
       source: 'web'
     }, {
@@ -195,8 +220,9 @@ asyncIntakeRouter.post('/web', checkBackpressure, tenantScopeMiddleware, upload.
 
     res.status(202).json({
       success: true,
-      message: 'Request queued for processing.',
+      message: 'Clinical claim queued for triage.',
       jobId: job.id,
+      claimId,
       ticketId,
       status: 'queued',
       trackingUrl: `/api/v1/intake/status/${job.id}`
