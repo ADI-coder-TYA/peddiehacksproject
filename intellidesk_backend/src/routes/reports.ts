@@ -4,15 +4,12 @@ import { generateExecutiveReport } from '../services/pdfReportService.js';
 const router = Router();
 
 /**
- * GET /api/v1/reports/executive-pdf
- * GET /admin/reports/executive-pdf
- * 
- * Downloadable Executive Audit PDF Report for University Deans & State Auditors
+ * Handler for generating clinical audit PDF stream
  */
-router.get('/executive-pdf', async (req: Request, res: Response) => {
+async function handleClinicalAuditPdf(req: Request, res: Response) {
   try {
     const timeframe = (req.query.timeframe as string) || '30d';
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : 'edu-admin-123')) as string;
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.query.institutionId as string) || 'default')) as string;
 
     console.log(`📑 [PDF Report] Generating MedAccess Clinical Audit PDF for Institution: ${instId}, Timeframe: ${timeframe}`);
 
@@ -27,6 +24,12 @@ router.get('/executive-pdf', async (req: Request, res: Response) => {
     console.error('🚨 [PDF Report] Error generating PDF report:', error);
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
-});
+}
+
+// GET /api/v1/reports/clinical-audit-pdf
+router.get('/clinical-audit-pdf', handleClinicalAuditPdf);
+
+// GET /api/v1/reports/executive-pdf
+router.get('/executive-pdf', handleClinicalAuditPdf);
 
 export default router;
