@@ -50,8 +50,8 @@ export async function computeImageHash(mediaUrl?: string): Promise<string | unde
  * Evaluate Emergency Fund Fraud Risk using image hashing, velocity checks, and autoencoder ML
  */
 export async function evaluateFraudRisk(
-  ticketId: string,
-  studentPhone: string,
+  claimId: string,
+  patientPhone: string,
   mediaUrl?: string,
   features?: number[],
   requestedAmount?: number,
@@ -63,44 +63,43 @@ export async function evaluateFraudRisk(
   // Check A: Duplicate Receipt Detection via SHA-256 Image Hash
   const imageHash = await computeImageHash(mediaUrl);
   if (imageHash) {
-    const { data: duplicateTickets } = await supabase
-      .from('tickets')
+    const { data: duplicateClaims } = await supabase
+      .from('claims')
       .select('id, created_at')
       .eq('receipt_image_hash', imageHash)
-      .neq('id', ticketId)
+      .neq('id', claimId)
       .limit(1);
 
-    if (duplicateTickets && duplicateTickets.length > 0) {
-      const existingId = duplicateTickets[0].id;
-      flagReasons.push(`DUPLICATE_RECEIPT_DETECTED: Receipt image has already been submitted on Ticket #${existingId}`);
+    if (duplicateClaims && duplicateClaims.length > 0) {
+      const existingId = duplicateClaims[0].id;
+      flagReasons.push(`DUPLICATE_RECEIPT_DETECTED: Receipt image already submitted on Claim #${existingId}`);
       riskScore += 0.50;
     }
   }
 
   // Check B: Velocity & Threshold Gaming Detection
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: recentTickets } = await supabase
-    .from('tickets')
-    .select('id, created_at, calculated_amount, recommended_grant_amount')
-    .eq('student_phone', studentPhone)
-    .neq('id', ticketId)
+  const { data: recentClaims } = await supabase
+    .from('claims')
+    .select('id, created_at, extracted_bill_amount, recommended_copay_amount')
+    .eq('patient_phone', patientPhone)
+    .neq('id', claimId)
     .gte('created_at', sevenDaysAgo);
 
-  const pastCount = recentTickets ? recentTickets.length : 0;
+  const pastCount = recentClaims ? recentClaims.length : 0;
   if (pastCount >= 2) {
     if (isLifeSafetyCritical) {
-      // Re-calibrated for Life-Safety: Repeat contacts in extreme crisis signal escalating distress, not fraud.
-      flagReasons.push(`HIGH_DISTRESS_REPEAT_CONTACT: Student submitted ${pastCount + 1} requests in 7 days (Crisis Escalation Active)`);
+      flagReasons.push(`HIGH_DISTRESS_REPEAT_CONTACT: Patient submitted ${pastCount + 1} requests in 7 days (Crisis Escalation Active)`);
     } else {
-      flagReasons.push(`HIGH_REQUEST_VELOCITY: Student submitted ${pastCount + 1} requests in 7 days`);
+      flagReasons.push(`PATIENT_HIGH_CLAIM_VELOCITY: Patient submitted ${pastCount + 1} claims in 7 days`);
       riskScore += 0.35;
     }
   }
 
   // Threshold Gaming: repeated micro-requests between $150 and $200 (bypass if life-safety critical)
   if (!isLifeSafetyCritical) {
-    const microGrants = (recentTickets || []).filter((t) => {
-      const amt = Number(t.calculated_amount || t.recommended_grant_amount || 0);
+    const microGrants = (recentClaims || []).filter((t: any) => {
+      const amt = Number(t.extracted_bill_amount || t.recommended_copay_amount || 0);
       return amt >= 150 && amt <= 200;
     });
 

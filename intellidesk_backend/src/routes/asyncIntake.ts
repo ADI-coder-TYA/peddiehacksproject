@@ -23,30 +23,24 @@ const upload = multer({
 
 // Zod Validation Schemas
 const WebIntakeSchema = z.object({
-  // At least one of message or studentContact must be present.
-  // A message provides the request content; studentContact is required for
-  // multi-channel follow-up (SMS/email). An attachment alone is only valid
-  // when studentContact is also provided so we can notify the student.
-  message: z.string().min(1, "Message must not be empty if provided.").optional(),
-  studentName: z.string().min(1).max(120).optional(),
-  studentContact: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || /^[+\d\s\-().]{7,20}$/.test(val) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
-      { message: "studentContact must be a valid phone number or email address." }
-    ),
+  message: z.string().optional(),
+  description: z.string().optional(),
+  patientName: z.string().optional(),
+  studentName: z.string().optional(),
+  patientContact: z.string().optional(),
+  patientPhone: z.string().optional(),
+  studentContact: z.string().optional(),
+  studentPhone: z.string().optional(),
+  clinicalCategory: z.string().optional(),
+  category: z.string().optional(),
 }).refine(
   (data) => {
-    // Rule 1: A submission must have a text message OR a file attachment (checked downstream).
-    // Rule 2: If no message text is provided, studentContact must exist so OCR results can be returned.
-    const hasTextContent = !!data.message;
-    const hasContactForAttachmentOnly = !!data.studentContact;
-    return hasTextContent || hasContactForAttachmentOnly;
+    const hasTextContent = !!(data.message || data.description);
+    const hasContact = !!(data.patientContact || data.patientPhone || data.studentContact || data.studentPhone);
+    return hasTextContent || hasContact;
   },
   {
-    message:
-      "Validation failed: provide a text message, or provide a document attachment with a studentContact for callback delivery.",
+    message: "Validation failed: provide a medical description or document attachment with contact info.",
   }
 );
 
@@ -79,12 +73,12 @@ asyncIntakeRouter.post('/web', checkBackpressure, tenantScopeMiddleware, upload.
     
     // Validate payload
     const parsedData = WebIntakeSchema.parse(req.body);
-    if (!parsedData.message && !req.file) {
-       res.status(400).json({ error: 'Please provide a message or attach a supporting document.' });
+    let fullMessage = parsedData.message || parsedData.description || req.body.description || '';
+    if (!fullMessage && !req.file) {
+       res.status(400).json({ error: 'Please provide a clinical description or attach a hospital receipt.' });
        return;
     }
 
-    let fullMessage = parsedData.message || '';
     let mediaUrl: string | undefined = req.body.media_url || req.body.attachment_url || req.body.receipt_url || req.body.mediaUrl || req.body.attachmentUrl || undefined;
 
     if (req.file) {
@@ -162,12 +156,13 @@ asyncIntakeRouter.post('/web', checkBackpressure, tenantScopeMiddleware, upload.
       : await classifyCategoryDynamic(fullMessage);
     const initialUrgency = lifeSafety.isLifeSafetyCritical ? 'Critical' : 'Routine';
 
+    const patientContact = parsedData.patientContact || parsedData.patientPhone || parsedData.studentContact || parsedData.studentPhone || req.body.patientPhone || 'web-client';
     let claimId: string = '';
     
     try {
       const { data: claimRow, error: claimErr } = await supabase.from('claims').insert([{
         institution_id: institutionId,
-        patient_phone: parsedData.studentContact || 'web-client',
+        patient_phone: patientContact,
         description: fullMessage,
         receipt_url: mediaUrl,
         clinical_category: initialCategory,
