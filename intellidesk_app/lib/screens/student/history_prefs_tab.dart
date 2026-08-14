@@ -462,7 +462,8 @@ class HistoryPrefsTab extends StatelessWidget {
     }
 
     final formattedDate = DateFormat('MMM dd, yyyy • hh:mm a').format(ticket.createdAt);
-    final voucherCode = ticket.voucherCode ?? (ticket.status == 'Auto-Approved' ? 'VCH-${ticket.id.substring(0, 8).toUpperCase()}' : null);
+    final safeId = ticket.id.length > 8 ? ticket.id.substring(0, 8) : ticket.id;
+    final voucherCode = ticket.voucherCode ?? (ticket.status == 'Auto-Approved' ? 'VCH-${safeId.toUpperCase()}' : null);
 
     return Card(
       elevation: isHighContrast ? 0 : 2,
@@ -655,7 +656,8 @@ class HistoryPrefsTab extends StatelessWidget {
                           final req = http.MultipartRequest('POST', uri);
                           req.headers['x-institution-id'] = ApiConfig.institutionId;
                           req.fields['studentContact'] = ticket.studentPhone;
-                          req.fields['message'] = 'Additional receipt/document for ticket #${ticket.id.substring(0, 8)}';
+                          final safeTicketId = ticket.id.length > 8 ? ticket.id.substring(0, 8) : ticket.id;
+                          req.fields['message'] = 'Additional receipt/document for ticket #$safeTicketId';
                           final mimeType = file.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
                           final dataUri = 'data:$mimeType;base64,${base64Encode(bytes)}';
                           req.fields['media_url'] = dataUri;

@@ -39,6 +39,12 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
     super.dispose();
   }
 
+  String _safeClaimId(dynamic id) {
+    if (id == null) return 'N/A';
+    final str = id.toString();
+    return str.length > 8 ? str.substring(0, 8) : str;
+  }
+
   void _initSocket() {
     try {
       _socket = IO.io(ApiConfig.socketUrl, <String, dynamic>{
@@ -59,7 +65,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
           _fetchClaims();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('💳 Disbursed Claim #${data['claimId']?.toString().substring(0, 8)} | ${data['approvedAmount']}'),
+              content: Text('💳 Disbursed Claim #${_safeClaimId(data['claimId'])} | ${data['approvedAmount']}'),
               backgroundColor: AppTheme.primaryBrand,
             ),
           );
@@ -70,7 +76,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('🚨 CRITICAL LIFE-SAFETY ALERT: ESI-1 Claim #${data['claimId']?.toString().substring(0, 8)}'),
+              content: Text('🚨 CRITICAL LIFE-SAFETY ALERT: ESI-1 Claim #${_safeClaimId(data['claimId'])}'),
               backgroundColor: AppTheme.emergencyRed,
               duration: const Duration(seconds: 6),
             ),
@@ -224,13 +230,13 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Claim #${claim['id']?.toString().substring(0, 8) ?? 'Details'}',
+                    'Claim #${_safeClaimId(claim['id'])}',
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: esiColor.withOpacity(0.15),
+                      color: esiColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -325,11 +331,21 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        backgroundColor: AppTheme.primaryBrand,
+        elevation: 0,
         title: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.monitor_heart, color: Colors.white, size: 22),
+            Icon(Icons.monitor_heart, color: Colors.white, size: 20),
             SizedBox(width: 8),
-            Text('MedAccess AI — Clinical War Room'),
+            Flexible(
+              child: Text(
+                'Clinical War Room',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Colors.white),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -436,19 +452,19 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             leading: CircleAvatar(
-              backgroundColor: color.withOpacity(0.15),
+              backgroundColor: color.withValues(alpha: 0.15),
               child: Icon(Icons.local_hospital, color: color, size: 20),
             ),
             title: Row(
               children: [
                 Text(
-                  'Claim #${c['id']?.toString().substring(0, 8)}',
+                  'Claim #${_safeClaimId(c['id'])}',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(4)),
+                  decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
                   child: Text(esi.replaceFirst('ESI_', 'ESI '), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
                 ),
               ],
