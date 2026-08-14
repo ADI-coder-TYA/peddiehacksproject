@@ -132,6 +132,27 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Register new Healthcare Facility Admin and batch-import patient roster
+  Future<bool> signupAdminWithRoster({
+    required String instituteName,
+    required String adminName,
+    required String adminEmail,
+    required String password,
+    required String institutionCode,
+    required String defaultStudentPassword,
+    required List<Map<String, String>> rosterStudents,
+  }) async {
+    return registerInstitution(
+      instituteName: instituteName,
+      adminName: adminName,
+      adminEmail: adminEmail,
+      password: password,
+      institutionId: institutionCode,
+      defaultStudentPassword: defaultStudentPassword,
+      students: rosterStudents.map((s) => Map<String, dynamic>.from(s)).toList(),
+    );
+  }
+
   /// Register new Institution Admin and batch-import student roster
   Future<bool> registerInstitution({
     required String instituteName,
