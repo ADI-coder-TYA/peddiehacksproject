@@ -17,37 +17,47 @@ export const requireAuth = (req: AuthenticatedRequest, res: Response, next: Next
   const authHeader = req.headers.authorization;
   const roleHeader = req.headers['x-user-role'] as string;
   const emailHeader = req.headers['x-user-email'] as string;
+  const instHeader = (req.headers['x-institution-id'] || req.headers['x-tenant-id'] || req.query.institutionId || req.query.institution_id) as string;
 
   let token = '';
   if (authHeader && authHeader.startsWith('Bearer ')) {
     token = authHeader.substring(7);
   }
 
-  // Support demo JWT token parsing or fallback
-  if (token || roleHeader) {
+  // Support token parsing or header fallback
+  if (token || roleHeader || instHeader) {
     let role: 'STUDENT' | 'ADMIN' | 'AUDITOR' = 'STUDENT';
-    let email = emailHeader || 'user@university.edu';
+    let email = emailHeader || 'user@campushealth.edu';
     let name = 'Authenticated User';
 
     if (token.includes('admin') || roleHeader?.toUpperCase() === 'ADMIN') {
       role = 'ADMIN';
-      email = emailHeader || 's.chen@university.edu';
-      name = 'Dr. Sarah Chen';
+      email = emailHeader || 'admin@campushealth.edu';
+      name = 'Chief Medical Officer';
     } else if (token.includes('auditor') || roleHeader?.toUpperCase() === 'AUDITOR') {
       role = 'AUDITOR';
-      email = emailHeader || 'auditor@university.edu';
+      email = emailHeader || 'auditor@campushealth.edu';
       name = 'Internal Auditor';
     } else {
       role = 'STUDENT';
-      email = emailHeader || 'alex.j@university.edu';
-      name = 'Alex Johnson';
+      email = emailHeader || 'patient@campushealth.edu';
+      name = 'Patient Member';
+    }
+
+    let institutionId = instHeader;
+    if (!institutionId && token.includes('jwt_token_admin_')) {
+      const parts = token.replace('jwt_token_admin_', '').split('_');
+      institutionId = parts[0];
+    }
+    if (!institutionId) {
+      institutionId = 'inst-001';
     }
 
     req.user = {
       id: token ? `usr_${role.toLowerCase()}` : 'usr_default',
       email,
       role,
-      institutionId: (req.headers['x-institution-id'] as string) || 'edu-admin-123',
+      institutionId,
       name,
     };
 

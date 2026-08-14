@@ -7,16 +7,13 @@ const DEFAULT_TOTAL_BUDGET = 150000;
 
 telemetryRouter.get('/', async (req: Request, res: Response) => {
   try {
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.query.institutionId as string) || 'default')) as string;
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || (req.query.institutionId as string) || 'inst-001')) as string;
 
-    // 1. Fetch claims for aggregation from primary claims table
+    // 1. Fetch claims for aggregation scoped to this institution
     let claimsQuery = supabase
       .from('claims')
-      .select('id, created_at, updated_at, status, clinical_category, recommended_copay_amount, approved_amount, extracted_bill_amount, esi_level, crisis_severity_index');
-
-    if (instId && instId !== 'default' && instId !== 'all') {
-      claimsQuery = claimsQuery.eq('institution_id', instId);
-    }
+      .select('id, created_at, updated_at, status, clinical_category, recommended_copay_amount, approved_amount, extracted_bill_amount, esi_level, crisis_severity_index')
+      .eq('institution_id', instId);
 
     const { data: claims, error: claimsError } = await claimsQuery;
 
@@ -24,13 +21,14 @@ telemetryRouter.get('/', async (req: Request, res: Response) => {
       console.warn('⚠️ [Telemetry] Claims query notice:', claimsError.message);
     }
 
-    // 2. Fetch health fund pool from health_funds table
+    // 2. Fetch health fund pool from health_funds table scoped to this institution
     let totalBudget = DEFAULT_TOTAL_BUDGET;
     let totalDisbursed = 0;
     try {
       const { data: fundData } = await supabase
         .from('health_funds')
         .select('total_pool, total_disbursed')
+        .eq('institution_id', instId)
         .limit(1)
         .maybeSingle();
 
@@ -40,10 +38,11 @@ telemetryRouter.get('/', async (req: Request, res: Response) => {
       }
     } catch (_) {}
 
-    // 3. Fetch recent audit logs
+    // 3. Fetch recent audit logs scoped to this institution
     const { data: auditLogs } = await supabase
       .from('audit_logs')
       .select('*')
+      .eq('institution_id', instId)
       .order('created_at', { ascending: false })
       .limit(50);
 

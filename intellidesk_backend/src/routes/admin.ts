@@ -13,16 +13,13 @@ const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_
 
 router.get('/tickets', async (req: Request, res: Response) => {
   try {
-    let query = supabase
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+    
+    const { data: claims, error } = await supabase
       .from('claims')
       .select('*')
+      .eq('institution_id', instId)
       .order('created_at', { ascending: false });
-
-    if (req.institution_id && req.institution_id !== 'default' && req.institution_id !== 'all') {
-      query = query.eq('institution_id', req.institution_id);
-    }
-
-    const { data: claims, error } = await query;
 
     if (error) {
       console.error('Error fetching claims in admin/tickets:', error);
@@ -44,17 +41,42 @@ router.get('/tickets', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/roster', async (req: Request, res: Response) => {
+  try {
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+
+    const { data: roster, error } = await supabase
+      .from('patient_rosters')
+      .select('*')
+      .eq('institution_id', instId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('⚠️ [Admin Roster] Notice fetching patient_rosters:', error.message);
+      return res.status(200).json([]);
+    }
+
+    return res.json(roster || []);
+  } catch (err: any) {
+    console.error('Error in admin /roster:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 router.get('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id) as string;
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+
     const { data: claim, error } = await supabase
       .from('claims')
       .select('*')
       .eq('id', id)
+      .eq('institution_id', instId)
       .maybeSingle();
 
     if (error || !claim) {
-      res.status(404).json({ error: 'Claim not found' });
+      res.status(404).json({ error: 'Claim not found for this facility' });
       return;
     }
 

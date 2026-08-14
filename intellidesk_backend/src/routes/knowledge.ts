@@ -265,9 +265,12 @@ knowledgeRouter.post(
 
 knowledgeRouter.get('/list', async (req: Request, res: Response) => {
   try {
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+
     const { data, error } = await supabase
       .from('policy_embeddings')
       .select('id, policy_name, category, policy_chunk, max_coverage_limit, created_at')
+      .eq('institution_id', instId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -315,6 +318,8 @@ knowledgeRouter.get('/list', async (req: Request, res: Response) => {
 
 knowledgeRouter.delete('/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
+  const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+
   if (!id) {
     res.status(400).json({ error: 'Invalid document ID.' });
     return;
@@ -323,6 +328,7 @@ knowledgeRouter.delete('/:id', async (req: Request, res: Response) => {
   const { error } = await supabase
     .from('policy_embeddings')
     .delete()
+    .eq('institution_id', instId)
     .or(`id.eq.${id},policy_name.ilike.%${id}%`);
 
   if (error) {
