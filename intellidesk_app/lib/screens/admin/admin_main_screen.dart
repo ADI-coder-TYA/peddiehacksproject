@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/ticket_provider.dart';
 import '../../widgets/kanban_board.dart';
 import 'admin_telemetry_dashboard_screen.dart';
+import 'admin_health_funds_screen.dart';
 import 'admin_compliance_audit_screen.dart';
 import 'admin_war_room_screen.dart';
 import 'admin_knowledge_base_screen.dart';
@@ -119,6 +120,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                                           label: Text('Clinical Telemetry'),
                                         ),
                                         NavigationRailDestination(
+                                          icon: Icon(Icons.account_balance_wallet_outlined),
+                                          selectedIcon: Icon(Icons.account_balance_wallet),
+                                          label: Text('Health Funds'),
+                                        ),
+                                        NavigationRailDestination(
                                           icon: Icon(Icons.verified_user_outlined),
                                           selectedIcon: Icon(Icons.verified_user),
                                           label: Text('HIPAA Audit'),
@@ -164,12 +170,14 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       case 1:
         return const AdminTelemetryDashboardScreen();
       case 2:
-        return const AdminComplianceAuditScreen();
+        return const AdminHealthFundsScreen();
       case 3:
-        return const AdminWarRoomScreen();
+        return const AdminComplianceAuditScreen();
       case 4:
-        return const AdminKnowledgeBaseScreen();
+        return const AdminWarRoomScreen();
       case 5:
+        return const AdminKnowledgeBaseScreen();
+      case 6:
         return const UserProfileScreen();
       default:
         return const KanbanBoard();
@@ -201,6 +209,11 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             icon: Icon(Icons.analytics_outlined),
             selectedIcon: Icon(Icons.analytics, color: Color(0xFF0D9488)),
             label: 'Telemetry',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet_outlined),
+            selectedIcon: Icon(Icons.account_balance_wallet, color: Color(0xFF0D9488)),
+            label: 'Funds',
           ),
           NavigationDestination(
             icon: Icon(Icons.verified_user_outlined),

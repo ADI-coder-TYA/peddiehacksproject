@@ -269,6 +269,20 @@ class ApiService {
     }
   }
 
+  Future<bool> deleteHealthFund(String id) async {
+    final response = await http.delete(
+      Uri.parse('$baseUrl/admin/telemetry/funds/$id'),
+      headers: ApiConfig.adminHeaders,
+    );
+
+    if (response.statusCode == 200) {
+      return true;
+    } else {
+      final decoded = json.decode(response.body);
+      throw Exception(decoded['error'] ?? 'Failed to delete health fund');
+    }
+  }
+
   Future<Map<String, dynamic>> runCrisisStressTest({int scenarioCount = 10}) async {
     final response = await http.post(
       Uri.parse('$baseUrl/simulation/run-stress-test'),

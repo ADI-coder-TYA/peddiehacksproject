@@ -12,7 +12,7 @@ const DEFAULT_TOTAL_BUDGET = 150000;
  */
 telemetryRouter.get('/funds', async (req: Request, res: Response) => {
   try {
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || 'inst-001')) as string;
 
     const { data: funds, error } = await supabase
       .from('health_funds')
@@ -37,7 +37,7 @@ telemetryRouter.get('/funds', async (req: Request, res: Response) => {
  */
 telemetryRouter.post('/funds/allocate', async (req: Request, res: Response) => {
   try {
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || 'inst-001')) as string;
     const { name, category, amount, currency = 'INR' } = req.body;
 
     const fundName = (name || 'Emergency Health Relief Pool').trim();
@@ -105,6 +105,35 @@ telemetryRouter.post('/funds/allocate', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('[Telemetry] Error allocating health fund:', err);
     return res.status(500).json({ error: err.message || 'Failed to allocate health fund' });
+  }
+});
+
+/**
+ * DELETE /api/v1/admin/telemetry/funds/:id
+ * Removes a health fund pool from Supabase
+ */
+telemetryRouter.delete('/funds/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || 'inst-001')) as string;
+
+    if (!id) {
+      return res.status(400).json({ error: 'Fund ID is required.' });
+    }
+
+    const { error } = await supabase
+      .from('health_funds')
+      .delete()
+      .eq('id', id)
+      .eq('institution_id', instId);
+
+    if (error) throw error;
+
+    await logAuditEvent(instId, String(id), 'FUND_DELETION', 'CLINICAL_ADMIN', { fundId: String(id) });
+
+    return res.json({ success: true, message: 'Health fund deleted successfully.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to delete health fund' });
   }
 });
 
