@@ -250,4 +250,12 @@ chatRouter.get('/messages/:ticketId', async (req: Request, res: Response) => {
   }
 });
 
+import { ChatController } from '../controllers/chatController.js';
+
+// ─── POST /api/v1/chat/claims/:id/messages ───────────────────────
+chatRouter.post('/claims/:id/messages', ChatController.sendClaimMessage);
+
+// ─── GET /api/v1/chat/claims/:id/messages ────────────────────────
+chatRouter.get('/claims/:id/messages', ChatController.getClaimMessages);
+
 export default chatRouter;

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { ClaimsController } from '../controllers/claimsController.js';
+import { ChatController } from '../controllers/chatController.js';
 
 const router = Router();
 
@@ -14,5 +15,11 @@ router.post('/:id/disburse', ClaimsController.disburseClaim);
 
 // POST /api/v1/claims/:id/override (Admin ESI / Fraud override)
 router.post('/:id/override', ClaimsController.overrideClaim);
+
+// POST /api/v1/claims/:id/messages (Multi-turn PFA counselor chat)
+router.post('/:id/messages', ChatController.sendClaimMessage);
+
+// GET /api/v1/claims/:id/messages (Fetch chat message history)
+router.get('/:id/messages', ChatController.getClaimMessages);
 
 export default router;
