@@ -147,6 +147,7 @@ class AuthProvider extends ChangeNotifier {
     required String institutionCode,
     String? department,
     String? phone,
+    double? initialFundPool,
     required String defaultStudentPassword,
     required List<Map<String, String>> rosterStudents,
   }) async {
@@ -158,6 +159,7 @@ class AuthProvider extends ChangeNotifier {
       institutionId: institutionCode,
       department: department,
       phone: phone,
+      initialFundPool: initialFundPool,
       defaultStudentPassword: defaultStudentPassword,
       students: rosterStudents.map((s) => Map<String, dynamic>.from(s)).toList(),
     );
@@ -173,6 +175,7 @@ class AuthProvider extends ChangeNotifier {
     required String institutionId,
     String? department,
     String? phone,
+    double? initialFundPool,
     required List<Map<String, dynamic>> students,
     String? csvContent,
   }) async {
@@ -191,6 +194,7 @@ class AuthProvider extends ChangeNotifier {
           institutionId: institutionId,
           department: department,
           phone: phone,
+          initialFundPool: initialFundPool,
           students: students,
           csvContent: csvContent,
         );

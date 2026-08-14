@@ -166,6 +166,7 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
       institutionCode: _instCodeCtrl.text.trim(),
       department: _specialtyCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
+      initialFundPool: double.tryParse(_fundPoolCtrl.text.trim()) ?? 150000.0,
       defaultStudentPassword: _defaultStudentPasswordCtrl.text.trim(),
       rosterStudents: _parsedStudents,
     );

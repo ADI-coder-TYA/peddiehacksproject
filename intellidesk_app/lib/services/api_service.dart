@@ -167,6 +167,7 @@ class ApiService {
     required String institutionId,
     String? department,
     String? phone,
+    double? initialFundPool,
     required List<Map<String, dynamic>> students,
     String? csvContent,
   }) async {
@@ -186,6 +187,7 @@ class ApiService {
         'department': department ?? 'Clinical Triage & Emergency Copay Desk',
         'specialty': department ?? 'Clinical Triage & Emergency Copay Desk',
         'phone': phone ?? '+91 98111 22334',
+        'fundPool': initialFundPool ?? 150000.0,
         'students': students,
         'csvContent': csvContent,
       }),
@@ -222,6 +224,48 @@ class ApiService {
       return decoded;
     } else {
       throw Exception(decoded['error'] ?? 'Failed to update password');
+    }
+  }
+
+  Future<Map<String, dynamic>> allocateHealthFund({
+    required String name,
+    required String category,
+    required double amount,
+    String currency = 'INR',
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/admin/telemetry/funds/allocate'),
+      headers: ApiConfig.adminHeaders,
+      body: json.encode({
+        'name': name,
+        'category': category,
+        'amount': amount,
+        'currency': currency,
+      }),
+    );
+
+    final decoded = json.decode(response.body) as Map<String, dynamic>;
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return decoded;
+    } else {
+      throw Exception(decoded['error'] ?? 'Failed to allocate health fund');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchHealthFunds() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/admin/telemetry/funds'),
+      headers: ApiConfig.adminAuthHeaders,
+    );
+
+    if (response.statusCode == 200) {
+      final decoded = json.decode(response.body);
+      if (decoded is List) {
+        return List<Map<String, dynamic>>.from(decoded);
+      }
+      return [];
+    } else {
+      throw Exception('Failed to fetch health funds');
     }
   }
 

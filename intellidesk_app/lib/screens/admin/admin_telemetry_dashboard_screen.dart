@@ -274,17 +274,29 @@ class BudgetUtilizationCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEE4D9F).withValues(alpha: 0.12),
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: const Icon(Icons.account_balance_wallet, color: Color(0xFFEE4D9F), size: 22),
+                    child: const Icon(Icons.account_balance_wallet, color: Color(0xFF0D9488), size: 22),
                   ),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
-                      'Live Fund Utilization & Burn Rate',
+                      'Live Fund Utilization & Pool Reserves',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F1B2C)),
                       overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: () => _showAllocateFundDialog(context, provider),
+                    icon: const Icon(Icons.add_circle_outline, size: 16),
+                    label: const Text('Allocate Funds', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0D9488),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
                     ),
                   ),
                 ],
@@ -293,30 +305,198 @@ class BudgetUtilizationCard extends StatelessWidget {
               
               // Financial Aid Fund Gauge
               _buildBudgetGauge(
-                title: 'Financial Aid Fund',
+                title: 'Emergency Relief Pool',
                 disbursed: data.financialAidDisbursed,
                 remaining: data.financialAidRemaining,
                 progress: finAidProgress.clamp(0.0, 1.0),
                 estimatedDays: data.estimatedDaysFinancialAid,
-                color: const Color(0xFF3B82F6),
+                color: const Color(0xFF0D9488),
                 format: currencyFormat,
               ),
               const SizedBox(height: 20),
 
               // Alumni Fund Gauge
               _buildBudgetGauge(
-                title: 'Alumni Emergency Fund',
+                title: 'Alumni & Donor Copay Reserve',
                 disbursed: data.alumniFundDisbursed,
                 remaining: data.alumniFundRemaining,
                 progress: alumniProgress.clamp(0.0, 1.0),
                 estimatedDays: data.estimatedDaysAlumniFund,
-                color: const Color(0xFF8B5CF6),
+                color: const Color(0xFF0284C7),
                 format: currencyFormat,
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  void _showAllocateFundDialog(BuildContext context, TelemetryProvider provider) {
+    final nameCtrl = TextEditingController(text: 'Apex Emergency Copay & Relief Pool');
+    final amountCtrl = TextEditingController(text: '50000');
+    String selectedCategory = 'Emergency Inpatient & Trauma';
+    final formKey = GlobalKey<FormState>();
+    bool isSubmitting = false;
+
+    final categories = [
+      'Emergency Inpatient & Trauma',
+      'Prescription & Pharmacy Copay',
+      'Diagnostic, Lab & Imaging Relief',
+      'Mental Health & Tele-Counseling',
+      'General Healthcare Welfare Pool',
+    ];
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setModalState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.add_card, color: Color(0xFF0D9488), size: 24),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Allocate Health Funds',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Inject or top up emergency health fund reserves for instant patient copay approvals.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: InputDecoration(
+                      labelText: 'Fund Pool Name',
+                      prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                  ),
+                  const SizedBox(height: 14),
+                  DropdownButtonFormField<String>(
+                    value: selectedCategory,
+                    decoration: InputDecoration(
+                      labelText: 'Clinical Category',
+                      prefixIcon: const Icon(Icons.category_outlined, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
+                    onChanged: (val) {
+                      if (val != null) setModalState(() => selectedCategory = val);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: 'Allocation Amount (₹)',
+                      prefixIcon: const Icon(Icons.currency_rupee, size: 20),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Required';
+                      final numVal = double.tryParse(v);
+                      if (numVal == null || numVal <= 0) return 'Enter a positive amount';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [25000, 50000, 100000, 250000].map((quickAmt) {
+                      return ActionChip(
+                        label: Text('+₹${NumberFormat.compact().format(quickAmt)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0D9488))),
+                        backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.08),
+                        onPressed: () {
+                          setModalState(() {
+                            amountCtrl.text = quickAmt.toString();
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSubmitting ? null : () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: isSubmitting
+                  ? null
+                  : () async {
+                      if (!formKey.currentState!.validate()) return;
+                      setModalState(() => isSubmitting = true);
+                      try {
+                        final amt = double.parse(amountCtrl.text.trim());
+                        final res = await ApiService().allocateHealthFund(
+                          name: nameCtrl.text.trim(),
+                          category: selectedCategory,
+                          amount: amt,
+                          currency: 'INR',
+                        );
+                        if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
+                        provider.retry();
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(res['message'] ?? 'Successfully allocated ₹$amt to health fund pool!'),
+                              backgroundColor: const Color(0xFF0D9488),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        setModalState(() => isSubmitting = false);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Allocation failed: $e'),
+                              backgroundColor: const Color(0xFFDC2626),
+                            ),
+                          );
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0D9488),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: isSubmitting
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Confirm Allocation', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

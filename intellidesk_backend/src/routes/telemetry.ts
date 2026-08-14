@@ -1,9 +1,112 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase.js';
+import { logAuditEvent } from '../services/auditLogger.js';
 
 const telemetryRouter = Router();
 
 const DEFAULT_TOTAL_BUDGET = 150000;
+
+/**
+ * GET /api/v1/admin/telemetry/funds
+ * Lists all active health fund pools for the institution
+ */
+telemetryRouter.get('/funds', async (req: Request, res: Response) => {
+  try {
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+
+    const { data: funds, error } = await supabase
+      .from('health_funds')
+      .select('*')
+      .eq('institution_id', instId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('⚠️ [Telemetry] Error fetching health_funds:', error.message);
+      return res.status(200).json([]);
+    }
+
+    return res.json(funds || []);
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/v1/admin/telemetry/funds/allocate
+ * Injects / allocates a new health fund pool or tops up an existing pool in Supabase
+ */
+telemetryRouter.post('/funds/allocate', async (req: Request, res: Response) => {
+  try {
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+    const { name, category, amount, currency = 'INR' } = req.body;
+
+    const fundName = (name || 'Emergency Health Relief Pool').trim();
+    const fundCategory = (category || 'Emergency Inpatient & Trauma').trim();
+    const allocAmount = Number(amount || 50000.0);
+
+    if (isNaN(allocAmount) || allocAmount <= 0) {
+      return res.status(400).json({ error: 'Valid positive allocation amount is required.' });
+    }
+
+    // Check if fund already exists for this institution and category
+    const { data: existingFund } = await supabase
+      .from('health_funds')
+      .select('*')
+      .eq('institution_id', instId)
+      .eq('name', fundName)
+      .maybeSingle();
+
+    let fundRecord;
+    if (existingFund) {
+      const newTotal = Number(existingFund.total_allocated || 0) + allocAmount;
+      const { data, error } = await supabase
+        .from('health_funds')
+        .update({
+          total_allocated: newTotal,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingFund.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      fundRecord = data;
+    } else {
+      const { data, error } = await supabase
+        .from('health_funds')
+        .insert({
+          institution_id: instId,
+          name: fundName,
+          category: fundCategory,
+          total_allocated: allocAmount,
+          total_disbursed: 0.0,
+          currency: currency,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      fundRecord = data;
+    }
+
+    // Log to audit trail
+    await logAuditEvent(instId, fundRecord.id, 'FUND_ALLOCATION', 'CLINICAL_ADMIN', {
+      fundName,
+      fundCategory,
+      allocatedAmount: allocAmount,
+      currency,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Successfully allocated ₹${allocAmount.toLocaleString()} to ${fundName}`,
+      fund: fundRecord,
+    });
+  } catch (err: any) {
+    console.error('[Telemetry] Error allocating health fund:', err);
+    return res.status(500).json({ error: err.message || 'Failed to allocate health fund' });
+  }
+});
 
 telemetryRouter.get('/', async (req: Request, res: Response) => {
   try {
@@ -27,14 +130,12 @@ telemetryRouter.get('/', async (req: Request, res: Response) => {
     try {
       const { data: fundData } = await supabase
         .from('health_funds')
-        .select('total_pool, total_disbursed')
-        .eq('institution_id', instId)
-        .limit(1)
-        .maybeSingle();
+        .select('total_pool, total_allocated, total_disbursed')
+        .eq('institution_id', instId);
 
-      if (fundData) {
-        totalBudget = Number(fundData.total_pool || DEFAULT_TOTAL_BUDGET);
-        totalDisbursed = Number(fundData.total_disbursed || 0);
+      if (fundData && fundData.length > 0) {
+        totalBudget = fundData.reduce((sum, f) => sum + Number(f.total_allocated || f.total_pool || 0), 0);
+        totalDisbursed = fundData.reduce((sum, f) => sum + Number(f.total_disbursed || 0), 0);
       }
     } catch (_) {}
 
