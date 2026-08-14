@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 
 class ClinicalChatScreen extends StatefulWidget {
@@ -59,7 +60,7 @@ class _ClinicalChatScreenState extends State<ClinicalChatScreen> {
     try {
       final claimId = widget.claimId ?? 'general';
       final response = await http.post(
-        Uri.parse('http://localhost:3000/api/v1/chat/claims/$claimId/messages'),
+        Uri.parse('${ApiConfig.baseUrl}/chat/claims/$claimId/messages'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'message': text,

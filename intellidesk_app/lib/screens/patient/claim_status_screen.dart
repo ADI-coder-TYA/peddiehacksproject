@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
+import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 import 'clinical_chat_screen.dart';
 
@@ -35,7 +36,7 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
 
   void _initSocket() {
     try {
-      _socket = IO.io('http://localhost:3000', <String, dynamic>{
+      _socket = IO.io(ApiConfig.socketUrl, <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': true,
       });
@@ -72,7 +73,7 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
   Future<void> _fetchClaimStatus() async {
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/api/v1/claims/${widget.claimId}'),
+        Uri.parse('${ApiConfig.baseUrl}/claims/${widget.claimId}'),
       );
 
       if (response.statusCode == 200) {

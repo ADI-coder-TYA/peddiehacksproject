@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:url_launcher/url_launcher.dart';
+import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 
 class AdminWarRoomScreen extends StatefulWidget {
@@ -40,7 +41,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
 
   void _initSocket() {
     try {
-      _socket = IO.io('http://localhost:3000', <String, dynamic>{
+      _socket = IO.io(ApiConfig.socketUrl, <String, dynamic>{
         'transports': ['websocket'],
         'autoConnect': true,
       });
@@ -83,7 +84,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
   Future<void> _fetchClaims() async {
     try {
       final response = await http.get(
-        Uri.parse('http://localhost:3000/api/v1/claims'),
+        Uri.parse('${ApiConfig.baseUrl}/claims'),
       );
 
       if (response.statusCode == 200) {
@@ -158,7 +159,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
 
     try {
       final res = await http.post(
-        Uri.parse('http://localhost:3000/api/v1/claims/$claimId/disburse'),
+        Uri.parse('${ApiConfig.baseUrl}/claims/$claimId/disburse'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'approvedAmount': amount,
@@ -185,7 +186,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
   }
 
   Future<void> _downloadAuditPdf() async {
-    final url = Uri.parse('http://localhost:3000/api/v1/reports/clinical-audit-pdf');
+    final url = Uri.parse('${ApiConfig.baseUrl}/reports/clinical-audit-pdf');
     try {
       if (await canLaunchUrl(url)) {
         await launchUrl(url, mode: LaunchMode.externalApplication);

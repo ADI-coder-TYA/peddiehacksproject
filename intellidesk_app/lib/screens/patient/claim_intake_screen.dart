@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
+import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import 'claim_status_screen.dart';
@@ -87,7 +87,7 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
       };
 
       final response = await http.post(
-        Uri.parse('http://localhost:3000/api/v1/intake/web'),
+        Uri.parse('${ApiConfig.baseUrl}/intake/web'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(payload),
       );
