@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 import '../../models/user_role.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/ticket_provider.dart';
-import '../../student_intake_tracker_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../../widgets/boutique_background.dart';
 import '../../widgets/role_guard.dart';
+import '../patient/claim_intake_screen.dart';
 import '../patient/clinical_chat_screen.dart';
 import '../patient/claim_status_screen.dart';
 
@@ -125,7 +125,7 @@ class _StudentMainScreenState extends State<StudentMainScreen> {
   Widget _buildBodyView(int index) {
     switch (index) {
       case 0:
-        return const StudentIntakeTrackerScreen();
+        return const ClaimIntakeScreen();
       case 1:
         return const ClinicalChatScreen();
       case 2:
@@ -133,7 +133,7 @@ class _StudentMainScreenState extends State<StudentMainScreen> {
       case 3:
         return const UserProfileScreen();
       default:
-        return const StudentIntakeTrackerScreen();
+        return const ClaimIntakeScreen();
     }
   }
 

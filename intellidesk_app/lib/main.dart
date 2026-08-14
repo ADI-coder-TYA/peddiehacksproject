@@ -6,13 +6,13 @@ import 'providers/ticket_provider.dart';
 import 'providers/job_tracking_manager.dart';
 import 'providers/accessibility_provider.dart';
 import 'providers/preferences_provider.dart';
-import 'chat_provider.dart';
 import 'offline_sync_engine.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/student/student_main_screen.dart';
 import 'screens/admin/admin_main_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'config/api_config.dart';
 import 'providers/claims_provider.dart';
 import 'providers/clinical_chat_provider.dart';
 import 'providers/war_room_provider.dart';
@@ -31,7 +31,6 @@ void main() async {
         ChangeNotifierProvider(create: (_) => ClaimsProvider()),
         ChangeNotifierProvider(create: (_) => ClinicalChatProvider()),
         ChangeNotifierProvider(create: (_) => WarRoomProvider()),
-        ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => OfflineQueueManager()),
         ChangeNotifierProvider(create: (_) => JobTrackingManager(
           socket: io.io(ApiConfig.socketUrl, io.OptionBuilder().setTransports(['websocket']).build()),
