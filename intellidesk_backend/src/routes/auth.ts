@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../config/supabase.js';
+import { v4 as uuidv4 } from 'uuid';
 
 const router = Router();
 
@@ -107,17 +108,35 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
     };
     INSTITUTIONS.set(instId, newInstitution);
 
-    // 2. Create Admin User Profile
+    // 2. Create Admin User Profile & Persist to Supabase
+    const adminUuid = uuidv4();
+    const adminName = (req.body.adminName || req.body.name || 'Clinical Administrator').trim();
+
     const adminUser = {
-      id: `usr_adm_${Date.now()}`,
-      name: req.body.adminName || 'Institute Administrator',
+      id: adminUuid,
+      name: adminName,
       email: email,
       role: 'ADMIN',
-      department: instName,
+      department: `${instName} Clinical Triage Desk`,
       institutionId: instId,
       token: `jwt_token_admin_${instId}_${Date.now()}`,
     };
     USER_STORE.set(email, adminUser);
+    USER_STORE.set(adminUuid, adminUser);
+
+    try {
+      await supabase.from('profiles').upsert({
+        id: adminUuid,
+        email: email,
+        full_name: adminName,
+        role: 'CLINICAL_ADMIN',
+        institution_id: instId,
+        phone: req.body.phone || req.body.adminPhone || '+91 98111 22334',
+        alerts_enabled: true,
+      });
+    } catch (profErr) {
+      console.warn('⚠️ [Supabase] Admin profile creation notice:', profErr);
+    }
 
     // 3. Parse CSV lines using Supabase `patient_rosters` table format or standard roster format
     let rosterList: any[] = Array.isArray(students) ? [...students] : [];
@@ -334,13 +353,49 @@ router.post('/login', async (req: Request, res: Response) => {
   // ADMIN LOGIN FLOW
   if (isRequestedAdmin) {
     let adminUser = USER_STORE.get(lookupKey);
+
     if (!adminUser) {
-      adminUser = {
-        ...DEFAULT_ADMIN,
-        email: lookupKey.length > 0 ? lookupKey : DEFAULT_ADMIN.email,
-      };
+      // Check Supabase profiles table
+      try {
+        const { data: dbProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('email', lookupKey)
+          .maybeSingle();
+
+        if (dbProfile) {
+          adminUser = {
+            id: dbProfile.id,
+            name: dbProfile.full_name || 'Clinical Administrator',
+            email: dbProfile.email,
+            role: 'ADMIN',
+            department: 'Clinical Triage & Emergency Copay Desk',
+            institutionId: dbProfile.institution_id || 'inst-001',
+            token: `jwt_token_admin_${dbProfile.institution_id}_${dbProfile.id}`,
+          };
+          USER_STORE.set(lookupKey, adminUser);
+        }
+      } catch (_) {}
     }
-    console.log(`🔒 [Multi-Tenancy] Scoped Admin login for Institution ID: ${adminUser.institutionId}`);
+
+    if (!adminUser) {
+      const derivedName = lookupKey.includes('@')
+        ? lookupKey.split('@')[0].replace(/[._-]/g, ' ').split(' ').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')
+        : 'Clinical Administrator';
+
+      adminUser = {
+        id: `usr_adm_${Date.now()}`,
+        name: derivedName.length > 0 ? derivedName : 'Clinical Administrator',
+        email: lookupKey.length > 0 ? lookupKey : 'admin@campushealth.edu',
+        role: 'ADMIN',
+        department: 'Clinical Triage & Emergency Copay Desk',
+        institutionId: req.body.institutionId || req.body.institution_id || 'inst-001',
+        token: `jwt_token_admin_${Date.now()}`,
+      };
+      USER_STORE.set(lookupKey, adminUser);
+    }
+
+    console.log(`🔒 [Multi-Tenancy] Authenticated Admin "${adminUser.name}" (${adminUser.email}) for Institution: ${adminUser.institutionId}`);
     return res.status(200).json({
       success: true,
       message: 'Admin authentication successful',

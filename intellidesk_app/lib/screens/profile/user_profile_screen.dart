@@ -119,6 +119,22 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
+  String _resolveDisplayName(dynamic user, bool isStudent) {
+    final name = user?.name?.toString().trim();
+    if (name != null && name.isNotEmpty) return name;
+    final email = user?.email?.toString().trim();
+    if (email != null && email.isNotEmpty && email.contains('@')) {
+      final handle = email.split('@')[0];
+      return handle
+          .replaceAll(RegExp(r'[._-]'), ' ')
+          .split(' ')
+          .where((s) => s.isNotEmpty)
+          .map((s) => '${s[0].toUpperCase()}${s.substring(1)}')
+          .join(' ');
+    }
+    return isStudent ? 'Patient' : 'Clinical Administrator';
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -186,7 +202,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        user?.name ?? (isStudent ? 'Patient' : 'Dr. Sarah Chen, MD'),
+                                        _resolveDisplayName(user, isStudent),
                                         overflow: TextOverflow.ellipsis,
                                         style: GoogleFonts.outfit(
                                           fontSize: isMobile ? 18 : 22,

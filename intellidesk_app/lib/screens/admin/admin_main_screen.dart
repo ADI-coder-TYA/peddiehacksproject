@@ -227,6 +227,22 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
     );
   }
 
+  String _resolveAdminDisplayName(dynamic user) {
+    final name = user?.name?.toString().trim();
+    if (name != null && name.isNotEmpty) return name;
+    final email = user?.email?.toString().trim();
+    if (email != null && email.isNotEmpty && email.contains('@')) {
+      final handle = email.split('@')[0];
+      return handle
+          .replaceAll(RegExp(r'[._-]'), ' ')
+          .split(' ')
+          .where((s) => s.isNotEmpty)
+          .map((s) => '${s[0].toUpperCase()}${s.substring(1)}')
+          .join(' ');
+    }
+    return 'Clinical Administrator';
+  }
+
   Widget _buildAdminHeader(bool isMobile, bool isConnected, dynamic user) {
     final titles = ['Clinical Claims & Emergency Copays', 'Institutional Clinical Telemetry', 'HIPAA Compliance & Tamper Logs', 'Clinical Crisis War Room', 'Institutional Clinical Policies', 'Medical Administrator Profile'];
     final currentTitle = _selectedIndex < titles.length ? titles[_selectedIndex] : 'Dashboard';
@@ -273,7 +289,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
                           children: [
                             Flexible(
                               child: Text(
-                                user?.name ?? 'Dr. Sarah Chen, MD',
+                                _resolveAdminDisplayName(user),
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.outfit(
                                   color: const Color(0xFF0F172A),
