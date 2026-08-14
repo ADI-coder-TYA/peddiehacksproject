@@ -13,9 +13,29 @@ class SocketService {
   
   Function(Ticket)? onTicketCreated;
   Function(Ticket)? onTicketUpdated;
+  Function(Map<String, dynamic>)? _onClaimUpdatedCallback;
+  Function(Map<String, dynamic>)? _onClaimDisbursedCallback;
+  Function(Map<String, dynamic>)? _onEmergencyAlertCallback;
+  Function(Map<String, dynamic>)? _onChatMessageCallback;
   Function(bool)? onConnectionStateChanged;
 
-  void connect() {
+  void onClaimUpdated(Function(Map<String, dynamic>) callback) {
+    _onClaimUpdatedCallback = callback;
+  }
+
+  void onClaimDisbursed(Function(Map<String, dynamic>) callback) {
+    _onClaimDisbursedCallback = callback;
+  }
+
+  void onEmergencyAlert(Function(Map<String, dynamic>) callback) {
+    _onEmergencyAlertCallback = callback;
+  }
+
+  void onChatMessage(Function(Map<String, dynamic>) callback) {
+    _onChatMessageCallback = callback;
+  }
+
+  void connect({String institutionId = 'default'}) {
     if (_socket != null && _socket!.connected) {
       if (onConnectionStateChanged != null) {
         onConnectionStateChanged!(true);
@@ -35,30 +55,56 @@ class SocketService {
     );
 
     _socket!.onConnect((_) {
-      debugPrint('Socket connected to $url');
+      debugPrint('🔌 [SocketService] Connected to $url');
+      _socket?.emit('join_admin', {'institutionId': institutionId});
+      _socket?.emit('join_institution', institutionId);
       if (onConnectionStateChanged != null) {
         onConnectionStateChanged!(true);
       }
     });
 
     _socket!.onReconnect((_) {
-      debugPrint('Socket reconnected to $url');
+      debugPrint('🔌 [SocketService] Reconnected to $url');
       if (onConnectionStateChanged != null) {
         onConnectionStateChanged!(true);
       }
     });
 
     _socket!.onConnectError((err) {
-      debugPrint('Socket connect_error: $err');
+      debugPrint('⚠️ [SocketService] connect_error: $err');
       if (onConnectionStateChanged != null) {
         onConnectionStateChanged!(false);
       }
     });
 
     _socket!.onDisconnect((_) {
-      debugPrint('Socket disconnected from $url');
+      debugPrint('🔌 [SocketService] Disconnected from $url');
       if (onConnectionStateChanged != null) {
         onConnectionStateChanged!(false);
+      }
+    });
+
+    _socket!.on('claim:updated', (data) {
+      if (data != null && _onClaimUpdatedCallback != null) {
+        _onClaimUpdatedCallback!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    _socket!.on('claim:disbursed', (data) {
+      if (data != null && _onClaimDisbursedCallback != null) {
+        _onClaimDisbursedCallback!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    _socket!.on('emergency:alert', (data) {
+      if (data != null && _onEmergencyAlertCallback != null) {
+        _onEmergencyAlertCallback!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    _socket!.on('chat:new_message', (data) {
+      if (data != null && _onChatMessageCallback != null) {
+        _onChatMessageCallback!(Map<String, dynamic>.from(data));
       }
     });
 
@@ -89,6 +135,11 @@ class SocketService {
     });
 
     _socket!.connect();
+  }
+
+  void joinClaim(String claimId) {
+    _socket?.emit('join_claim', claimId);
+    _socket?.emit('join_ticket', claimId);
   }
 
   void disconnect() {

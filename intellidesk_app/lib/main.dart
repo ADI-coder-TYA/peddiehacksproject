@@ -13,7 +13,9 @@ import 'screens/student/student_main_screen.dart';
 import 'screens/admin/admin_main_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as io;
-import 'config/api_config.dart';
+import 'providers/claims_provider.dart';
+import 'providers/clinical_chat_provider.dart';
+import 'providers/war_room_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,6 +28,9 @@ void main() async {
         ChangeNotifierProvider(create: (_) => AccessibilityProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => TicketProvider()),
+        ChangeNotifierProvider(create: (_) => ClaimsProvider()),
+        ChangeNotifierProvider(create: (_) => ClinicalChatProvider()),
+        ChangeNotifierProvider(create: (_) => WarRoomProvider()),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => OfflineQueueManager()),
         ChangeNotifierProvider(create: (_) => JobTrackingManager(
