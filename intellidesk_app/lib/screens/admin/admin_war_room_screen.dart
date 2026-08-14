@@ -19,9 +19,9 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
 
   List<Map<String, dynamic>> _claims = [];
   bool _isLoading = true;
-  double _totalDisbursed = 104600.0;
-  double _remainingFund = 45400.0;
-  int _criticalCount = 6;
+  double _totalDisbursed = 0.0;
+  double _remainingFund = 150000.0;
+  int _criticalCount = 0;
 
   @override
   void initState() {
@@ -53,7 +53,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
       });
 
       _socket?.onConnect((_) {
-        _socket?.emit('join_admin', {'institutionId': 'default'});
+        _socket?.emit('join_admin', {'institutionId': ApiConfig.institutionId});
       });
 
       _socket?.on('claim:updated', (data) {
@@ -91,6 +91,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
     try {
       final response = await http.get(
         Uri.parse('${ApiConfig.baseUrl}/claims'),
+        headers: ApiConfig.adminHeaders,
       );
 
       if (response.statusCode == 200) {
@@ -100,60 +101,20 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
             _claims = List<Map<String, dynamic>>.from(data);
             _isLoading = false;
             _criticalCount = _claims.where((c) => c['esi_level'] == 'ESI_1_CRITICAL' || c['is_life_safety_alert'] == true).length;
+            _totalDisbursed = _claims
+                .where((c) => c['status'] == 'Disbursed' || c['status'] == 'Approved')
+                .fold<double>(0.0, (sum, c) => sum + (c['approved_amount'] ?? c['recommended_copay_amount'] ?? 0.0).toDouble());
+            _remainingFund = (150000.0 - _totalDisbursed).clamp(0.0, 150000.0);
           });
         }
         return;
       }
-    } catch (_) {}
+    } catch (err) {
+      debugPrint('War Room claims fetch error: $err');
+    }
 
-    // Fallback seed claims
     if (mounted) {
       setState(() {
-        _claims = [
-          {
-            'id': 'clm-001',
-            'patient_phone': '+91 98765 43210',
-            'description': 'Acute chest trauma and severe breathing difficulty in ER.',
-            'clinical_category': 'Medical Emergency & Inpatient Care',
-            'esi_level': 'ESI_1_CRITICAL',
-            'crisis_severity_index': 0.95,
-            'is_life_safety_alert': true,
-            'extracted_bill_amount': 25000.0,
-            'currency': 'INR',
-            'recommended_copay_amount': 25000.0,
-            'status': 'Triage Active',
-            'fraud_risk_score': 0.05,
-          },
-          {
-            'id': 'clm-002',
-            'patient_phone': '+91 98111 22334',
-            'description': 'Emergency insulin refill and blood glucose stabilizer prescription.',
-            'clinical_category': 'Prescription & Pharmacy Copay',
-            'esi_level': 'ESI_2_EMERGENT',
-            'crisis_severity_index': 0.74,
-            'is_life_safety_alert': false,
-            'extracted_bill_amount': 3800.0,
-            'currency': 'INR',
-            'recommended_copay_amount': 3040.0,
-            'status': 'Submitted',
-            'fraud_risk_score': 0.02,
-          },
-          {
-            'id': 'clm-003',
-            'patient_phone': '+91 99223 34455',
-            'description': 'Suspected duplicate invoice from prior outpatient lab test.',
-            'clinical_category': 'Diagnostic, Lab & Imaging Relief',
-            'esi_level': 'ROUTINE',
-            'crisis_severity_index': 0.20,
-            'is_life_safety_alert': false,
-            'extracted_bill_amount': 2200.0,
-            'currency': 'INR',
-            'recommended_copay_amount': 0.0,
-            'status': 'Flagged',
-            'fraud_risk_score': 0.88,
-            'fraud_flags': 'DUPLICATE_INVOICE_HASH',
-          },
-        ];
         _isLoading = false;
       });
     }

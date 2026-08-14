@@ -17,7 +17,7 @@ class ApiConfig {
 
   static String get socketUrl => host;
 
-  static const String institutionId = 'edu-admin-123';
+  static const String institutionId = 'inst-001';
 
   // Demo fallback credentials
   static const String defaultAdminToken = 'jwt_mock_token_admin_sarah_chen';

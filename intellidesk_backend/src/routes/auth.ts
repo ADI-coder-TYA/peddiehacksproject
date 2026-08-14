@@ -8,28 +8,25 @@ const INSTITUTIONS: Map<string, any> = new Map();
 const STUDENT_ROSTERS: Map<string, any> = new Map(); // Key: email or phone
 const USER_STORE: Map<string, any> = new Map(); // Key: email or student_id
 
-// Seed default institution and whitelisted demo students
-const DEFAULT_INSTITUTION_ID = 'edu-admin-123';
+// Seed default institution and whitelisted demo patients
+const DEFAULT_INSTITUTION_ID = 'inst-001';
 INSTITUTIONS.set(DEFAULT_INSTITUTION_ID, {
   id: DEFAULT_INSTITUTION_ID,
-  name: 'Global EduAccess University',
-  domain: 'university.edu',
+  name: 'Apex Health & Medical Center',
+  domain: 'apexhealth.edu',
   createdAt: new Date().toISOString(),
 });
 
-// Seed Whitelisted Roster
+// Seed Whitelisted Patient Roster
 const DEFAULT_ROSTER = [
-  { student_id: 'STU-2026-001', email: 'aarav.sharma@univ.edu', phone: '+15550101001', name: 'Aarav Sharma', department: 'Computer Science' },
-  { student_id: 'STU-2026-002', email: 'priya.patel@univ.edu', phone: '+15550101002', name: 'Priya Patel', department: 'Electrical Engineering' },
-  { student_id: 'STU-2026-003', email: 'marcus.chen@univ.edu', phone: '+15550101003', name: 'Marcus Chen', department: 'Data Science' },
-  { student_id: 'STU-2026-004', email: 'elena.rostova@univ.edu', phone: '+15550101004', name: 'Elena Rostova', department: 'Mechanical Engineering' },
-  { student_id: 'STU-2026-005', email: 'jordan.taylor@univ.edu', phone: '+15550101005', name: 'Jordan Taylor', department: 'Business Administration' },
-  { student_id: 'STU-2026-006', email: 'sophia.rodriguez@univ.edu', phone: '+15550101006', name: 'Sophia Rodriguez', department: 'Biomedical Engineering' },
-  { student_id: 'STU-2026-007', email: 'rohan.gupta@univ.edu', phone: '+15550101007', name: 'Rohan Gupta', department: 'Computer Science' },
-  { student_id: 'STU-2026-001', email: 'alex@university.edu', phone: '+15550000001', name: 'Alex Johnson', department: 'Computer Science' },
-  { student_id: 'STU-2026-002', email: 'jordan@university.edu', phone: '+15550000002', name: 'Jordan Miller', department: 'Electrical Eng' },
-  { student_id: 'STU-2026-003', email: 'taylor@university.edu', phone: '+15550000003', name: 'Taylor Swift', department: 'Data Science' },
-  { student_id: 'STD-1001', email: 'alex.j@university.edu', phone: '+15550199', name: 'Alex Johnson', department: 'Computer Science' },
+  { student_id: 'PAT-2026-001', email: 'alex.rivera@campushealth.edu', phone: '+91 98765 43210', name: 'Alex Rivera', department: 'General Medicine & Outpatient' },
+  { student_id: 'PAT-2026-002', email: 'priya.sharma@campushealth.edu', phone: '+91 98111 22334', name: 'Priya Sharma', department: 'Pediatrics & Neonatal Care' },
+  { student_id: 'PAT-2026-003', email: 'marcus.chen@campushealth.edu', phone: '+91 98222 33445', name: 'Marcus Chen', department: 'Orthopedic & Trauma Surgery' },
+  { student_id: 'PAT-2026-004', email: 'elena.rostova@campushealth.edu', phone: '+91 98333 44556', name: 'Elena Rostova', department: 'Emergency & Acute Triage' },
+  { student_id: 'PAT-2026-005', email: 'jordan.taylor@campushealth.edu', phone: '+91 98444 55667', name: 'Jordan Taylor', department: 'Cardiology & Intensive Care' },
+  { student_id: 'PAT-2026-006', email: 'sophia.r@campushealth.edu', phone: '+91 98555 66778', name: 'Sophia Rodriguez', department: 'Neurology & Psychological Care' },
+  { student_id: 'PAT-2026-007', email: 'rohan.gupta@campushealth.edu', phone: '+91 98666 77889', name: 'Rohan Gupta', department: 'Oncology & Chemotherapy Relief' },
+  { student_id: 'PAT-2026-008', email: 'maya.lin@campushealth.edu', phone: '+91 98777 88990', name: 'Maya Lin', department: 'Pulmonology & Respiratory Care' },
 ];
 
 DEFAULT_ROSTER.forEach((r) => {
@@ -39,22 +36,27 @@ DEFAULT_ROSTER.forEach((r) => {
   STUDENT_ROSTERS.set(r.student_id.toLowerCase(), entry);
 });
 
-// Auto-seed default students to Supabase public.students if table is empty
+// Auto-seed default patients to Supabase public.patient_rosters if table is empty
 async function syncDefaultRosterToSupabase() {
   try {
-    const { data, error } = await supabase.from('students').select('id').limit(1);
+    const { data, error } = await supabase.from('patient_rosters').select('id').limit(1);
     if (!error && (!data || data.length === 0)) {
-      const defaultRows = DEFAULT_ROSTER.map((r) => ({
+      const defaultRows = DEFAULT_ROSTER.map((r, idx) => ({
         institution_id: DEFAULT_INSTITUTION_ID,
-        name: r.name,
+        patient_id: r.student_id || `PAT-2026-${100 + idx}`,
         email: r.email,
         phone: r.phone,
+        is_registered: false,
       }));
-      await supabase.from('students').insert(defaultRows);
-      console.log(`🚀 [Supabase] Auto-seeded ${defaultRows.length} default students into public.students table.`);
+      const { error: insertErr } = await supabase.from('patient_rosters').insert(defaultRows);
+      if (!insertErr) {
+        console.log(`🚀 [Supabase] Auto-seeded ${defaultRows.length} default patients into public.patient_rosters table.`);
+      } else {
+        console.warn('⚠️ [Supabase] patient_rosters seed notice:', insertErr.message);
+      }
     }
   } catch (e) {
-    console.warn('⚠️ [Supabase] Could not auto-seed default students:', e);
+    console.warn('⚠️ [Supabase] Could not auto-seed default patients:', e);
   }
 }
 syncDefaultRosterToSupabase();
@@ -117,30 +119,30 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
     };
     USER_STORE.set(email, adminUser);
 
-    // 3. Parse CSV lines using Supabase `students` table format or standard roster format
+    // 3. Parse CSV lines using Supabase `patient_rosters` table format or standard roster format
     let rosterList: any[] = Array.isArray(students) ? [...students] : [];
     if (csvContent && typeof csvContent === 'string') {
       const lines = csvContent.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
       if (lines.length > 0) {
         const header = lines[0].toLowerCase().split(',').map((h) => h.trim());
-        const hasHeader = header.some((h) => ['id', 'student_id', 'email', 'name', 'first_name', 'last_name', 'phone', 'institution_id', 'department'].includes(h));
+        const hasHeader = header.some((h) => ['id', 'patient_id', 'student_id', 'member_id', 'email', 'name', 'full_name', 'phone', 'institution_id', 'department', 'emergency_contact'].includes(h));
         const dataLines = hasHeader ? lines.slice(1) : lines;
 
         // Dynamic Header Mapping
-        let idIdx = header.findIndex((h) => h === 'id' || h === 'student_id' || h === 'studentid');
+        let idIdx = header.findIndex((h) => h === 'patient_id' || h === 'id' || h === 'student_id' || h === 'member_id');
         let instIdx = header.findIndex((h) => h === 'institution_id' || h === 'institutionid');
         let phoneIdx = header.findIndex((h) => h === 'phone' || h === 'phone_number' || h === 'contact');
-        let nameIdx = header.findIndex((h) => h === 'name' || h === 'student_name' || h === 'full_name');
+        let nameIdx = header.findIndex((h) => h === 'full_name' || h === 'name' || h === 'patient_name' || h === 'student_name');
         let firstNameIdx = header.findIndex((h) => h === 'first_name' || h === 'firstname');
         let lastNameIdx = header.findIndex((h) => h === 'last_name' || h === 'lastname');
-        let emailIdx = header.findIndex((h) => h === 'email' || h === 'student_email');
-        let deptIdx = header.findIndex((h) => h === 'department' || h === 'branch' || h === 'dept' || h === 'major' || h === 'stream');
+        let emailIdx = header.findIndex((h) => h === 'email' || h === 'patient_email' || h === 'student_email');
+        let deptIdx = header.findIndex((h) => h === 'department' || h === 'branch' || h === 'dept' || h === 'specialty');
 
         if (!hasHeader) {
           idIdx = 0;
-          emailIdx = 1;
-          phoneIdx = 2;
-          nameIdx = 3;
+          nameIdx = 1;
+          emailIdx = 2;
+          phoneIdx = 3;
         }
 
         dataLines.forEach((line) => {
@@ -153,36 +155,40 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
               name = `${first} ${last}`.trim();
             }
             rosterList.push({
+              patient_id: idIdx >= 0 && idIdx < parts.length ? parts[idIdx] : parts[0],
               student_id: idIdx >= 0 && idIdx < parts.length ? parts[idIdx] : parts[0],
               institution_id: instIdx >= 0 && instIdx < parts.length ? parts[instIdx] : instId,
               phone: phoneIdx >= 0 && phoneIdx < parts.length ? parts[phoneIdx] : '',
               name: name || '',
+              full_name: name || '',
               email: emailIdx >= 0 && emailIdx < parts.length ? parts[emailIdx] : (parts.length > 1 ? parts[1] : ''),
-              department: deptIdx >= 0 && deptIdx < parts.length ? parts[deptIdx] : 'General Academics',
+              department: deptIdx >= 0 && deptIdx < parts.length ? parts[deptIdx] : 'General Medicine',
             });
           }
         });
       }
     }
 
-    // 4. Whitelist & Pre-Provision students into roster store with default password
+    // 4. Whitelist & Pre-Provision patients into roster store with default password
     let whitelistedCount = 0;
-    const supabaseStudentsRows: any[] = [];
+    const supabaseRosterRows: any[] = [];
 
-    rosterList.forEach((st) => {
+    rosterList.forEach((st, idx) => {
       const stEmail = (st.email || '').trim().toLowerCase();
       const stPhone = (st.phone || '').trim();
-      const stId = (st.student_id || st.studentId || st.id || '').trim().toLowerCase();
-      const stName = st.name || (stEmail ? stEmail.split('@')[0] : 'Enrolled Student');
+      const stId = (st.patient_id || st.student_id || st.studentId || st.id || `PAT-${1000 + idx}`).trim();
+      const stName = st.full_name || st.name || (stEmail ? stEmail.split('@')[0] : 'Patient Member');
 
       const rosterEntry = {
         id: `rst_${Date.now()}_${whitelistedCount}`,
         institution_id: st.institution_id || instId,
-        student_id: stId || `STU-${1000 + whitelistedCount}`,
+        patient_id: stId,
+        student_id: stId,
         email: stEmail,
         phone: stPhone,
         name: stName,
-        department: st.department || 'General Academics',
+        full_name: stName,
+        department: st.department || 'General Medicine',
         password: st.password || defaultStudentPassword,
         passwordChanged: false,
         is_registered: true,
@@ -190,38 +196,55 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
 
       if (stEmail) STUDENT_ROSTERS.set(stEmail, rosterEntry);
       if (stPhone) STUDENT_ROSTERS.set(stPhone, rosterEntry);
-      if (stId) STUDENT_ROSTERS.set(stId, rosterEntry);
+      if (stId) STUDENT_ROSTERS.set(stId.toLowerCase(), rosterEntry);
 
-      supabaseStudentsRows.push({
+      supabaseRosterRows.push({
         institution_id: st.institution_id || instId,
-        name: stName,
+        patient_id: stId,
         email: stEmail || null,
         phone: stPhone || null,
+        is_registered: true,
       });
 
       whitelistedCount++;
     });
 
-    // 5. Persist to Supabase public.students table
-    if (supabaseStudentsRows.length > 0) {
+    // 5. Persist to Supabase public.patient_rosters table
+    if (supabaseRosterRows.length > 0) {
       try {
-        const { error: dbError } = await supabase.from('students').insert(supabaseStudentsRows);
+        const { error: dbError } = await supabase.from('patient_rosters').insert(supabaseRosterRows);
         if (dbError) {
-          console.error('⚠️ [Supabase] Failed to persist students to public.students table:', dbError);
+          console.error('⚠️ [Supabase] Failed to persist patients to public.patient_rosters table:', dbError);
         } else {
-          console.log(`🚀 [Supabase] Successfully persisted ${supabaseStudentsRows.length} students to public.students table.`);
+          console.log(`🚀 [Supabase] Successfully persisted ${supabaseRosterRows.length} patients to public.patient_rosters table.`);
         }
       } catch (dbErr) {
-        console.error('⚠️ [Supabase] Error inserting students into table:', dbErr);
+        console.error('⚠️ [Supabase] Error inserting patients into patient_rosters table:', dbErr);
       }
     }
 
+    // Also persist facility into institutions and health_funds table in Supabase
+    try {
+      await supabase.from('institutions').upsert({
+        id: instId,
+        name: instName,
+        domain: adminEmail.includes('@') ? adminEmail.split('@')[1] : 'hospital.org',
+      });
+      await supabase.from('health_funds').upsert({
+        institution_id: instId,
+        fund_name: `${instName} Emergency Health Relief Fund`,
+        total_pool: 150000.0,
+        total_disbursed: 0.0,
+        currency: 'INR',
+      });
+    } catch (_) {}
+
     // Telemetry Log
-    console.log(`🏢 [Tenant Engine] Created Institution "${instName}" | Provisioned ${whitelistedCount} students with default password "${defaultStudentPassword}"`);
+    console.log(`🏢 [Tenant Engine] Created Healthcare Facility "${instName}" | Provisioned ${whitelistedCount} patients with default password "${defaultStudentPassword}"`);
 
     return res.status(201).json({
       success: true,
-      message: `Created Institution "${instName}" with ${whitelistedCount} provisioned students. Default Password: "${defaultStudentPassword}".`,
+      message: `Created Healthcare Facility "${instName}" with ${whitelistedCount} provisioned patients. Default Password: "${defaultStudentPassword}".`,
       institution: newInstitution,
       admin: adminUser,
       defaultStudentPassword,
@@ -236,6 +259,66 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
 // Alias route for backward compatibility
 router.post('/register-institution', (req: Request, res: Response) => {
   return (router as any).handle({ ...req, url: '/admin/register-tenant', method: 'POST' }, res);
+});
+
+/**
+ * POST /api/v1/auth/roster/import
+ * Directly import/sync CSV patient roster into Supabase public.patient_rosters
+ */
+router.post('/roster/import', async (req: Request, res: Response) => {
+  try {
+    const institutionId = req.body.institutionId || req.body.institution_id || req.headers['x-institution-id'] || 'default';
+    const { csvContent, roster } = req.body;
+    const itemsToInsert: any[] = [];
+
+    if (csvContent && typeof csvContent === 'string') {
+      const lines = csvContent.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+      if (lines.length > 0) {
+        const header = lines[0].toLowerCase().split(',').map((h) => h.trim());
+        const hasHeader = header.some((h) => ['id', 'patient_id', 'student_id', 'member_id', 'email', 'name', 'full_name', 'phone', 'contact'].includes(h));
+        const dataLines = hasHeader ? lines.slice(1) : lines;
+
+        const idIdx = header.findIndex((h) => h === 'patient_id' || h === 'id' || h === 'student_id' || h === 'member_id');
+        const emailIdx = header.findIndex((h) => h === 'email' || h === 'patient_email');
+        const phoneIdx = header.findIndex((h) => h === 'phone' || h === 'phone_number' || h === 'contact');
+
+        dataLines.forEach((line, idx) => {
+          const cols = line.split(',').map((c) => c.trim());
+          if (cols.length > 0 && cols[0]) {
+            itemsToInsert.push({
+              institution_id: institutionId,
+              patient_id: idIdx >= 0 && idIdx < cols.length ? cols[idIdx] : `PAT-2026-${100 + idx}`,
+              email: emailIdx >= 0 && emailIdx < cols.length ? cols[emailIdx] : (cols.length > 1 ? cols[1] : null),
+              phone: phoneIdx >= 0 && phoneIdx < cols.length ? cols[phoneIdx] : (cols.length > 2 ? cols[2] : null),
+              is_registered: true,
+            });
+          }
+        });
+      }
+    } else if (Array.isArray(roster) && roster.length > 0) {
+      roster.forEach((r: any, idx: number) => {
+        itemsToInsert.push({
+          institution_id: r.institutionId || r.institution_id || institutionId,
+          patient_id: r.patientId || r.patient_id || r.id || `PAT-2026-${100 + idx}`,
+          email: r.email || null,
+          phone: r.phone || null,
+          is_registered: true,
+        });
+      });
+    }
+
+    if (itemsToInsert.length > 0) {
+      const { data, error } = await supabase.from('patient_rosters').insert(itemsToInsert).select();
+      if (error) {
+        return res.status(400).json({ error: error.message });
+      }
+      return res.status(201).json({ success: true, count: data?.length || itemsToInsert.length, patients: data });
+    }
+
+    return res.status(400).json({ error: 'No valid roster entries found to import.' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
 });
 
 /**

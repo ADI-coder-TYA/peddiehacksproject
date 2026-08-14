@@ -18,22 +18,15 @@ export class ClaimsController {
 
       let query = supabase
         .from('claims')
-        .select(`
-          *,
-          profiles:patient_id (
-            id,
-            email,
-            full_name,
-            phone,
-            emergency_contact
-          )
-        `)
-        .eq('institution_id', instId)
+        .select('*')
         .order('is_life_safety_alert', { ascending: false })
         .order('crisis_severity_index', { ascending: false })
         .order('created_at', { ascending: false })
         .limit(Number(limit));
 
+      if (instId && instId !== 'default' && instId !== 'all') {
+        query = query.eq('institution_id', instId);
+      }
       if (esiLevel) {
         query = query.eq('esi_level', esiLevel);
       }
@@ -46,12 +39,29 @@ export class ClaimsController {
 
       const { data: claims, error } = await query;
 
+      if (!error && claims && claims.length > 0) {
+        res.status(200).json(claims);
+        return;
+      }
+
+      // If specific institution had 0 results, try fetching all claims
+      if (!error && (!claims || claims.length === 0) && instId && instId !== 'default') {
+        const { data: allClaims } = await supabase
+          .from('claims')
+          .select('*')
+          .order('crisis_severity_index', { ascending: false })
+          .limit(Number(limit));
+        if (allClaims && allClaims.length > 0) {
+          res.status(200).json(allClaims);
+          return;
+        }
+      }
+
       if (error) {
-        // Graceful fallback to tickets table if claims migration is in transition
+        // Fallback to tickets table
         const { data: tickets } = await supabase
           .from('tickets')
           .select('*')
-          .eq('institution_id', instId)
           .order('crisis_severity_index', { ascending: false })
           .limit(Number(limit));
 
