@@ -1,0 +1,9 @@
+patient_id,full_name,email,phone,emergency_contact,department
+PAT-2026-001,Alex Rivera,alex.rivera@campushealth.edu,+91 98765 43210,+91 98765 43211,General Medicine & Outpatient
+PAT-2026-002,Priya Sharma,priya.sharma@campushealth.edu,+91 98111 22334,+91 98111 22335,Pediatrics & Neonatal Care
+PAT-2026-003,Marcus Chen,marcus.chen@campushealth.edu,+91 98222 33445,+91 98222 33446,Orthopedic & Trauma Surgery
+PAT-2026-004,Elena Rostova,elena.rostova@campushealth.edu,+91 98333 44556,+91 98333 44557,Emergency & Acute Triage
+PAT-2026-005,Jordan Taylor,jordan.taylor@campushealth.edu,+91 98444 55667,+91 98444 55668,Cardiology & Intensive Care
+PAT-2026-006,Sophia Rodriguez,sophia.r@campushealth.edu,+91 98555 66778,+91 98555 66779,Neurology & Psychological Care
+PAT-2026-007,Rohan Gupta,rohan.gupta@campushealth.edu,+91 98666 77889,+91 98666 77890,Oncology & Chemotherapy Relief
+PAT-2026-008,Maya Lin,maya.lin@campushealth.edu,+91 98777 88990,+91 98777 88991,Pulmonology & Respiratory Care
