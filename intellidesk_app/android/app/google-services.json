@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "918419916002",
+    "project_id": "intellideskai-83763",
+    "storage_bucket": "intellideskai-83763.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:918419916002:android:23b4f09e4e408617cc8abb",
+        "android_client_info": {
+          "package_name": "com.example.intellidesk_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAVg2cG7H14Q9LDgZ_kPwflNWrWbooj79c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
