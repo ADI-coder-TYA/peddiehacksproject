@@ -60,11 +60,40 @@ async function syncDefaultRosterToSupabase() {
     console.warn('⚠️ [Supabase] Could not auto-seed default patients:', e);
   }
 }
-syncDefaultRosterToSupabase();
+// Auto-seed default admin profile to Supabase public.profiles if empty
+async function syncDefaultAdminToSupabase() {
+  try {
+    const { data } = await supabase.from('profiles').select('id').eq('role', 'CLINICAL_ADMIN').limit(1);
+    if (!data || data.length === 0) {
+      const defaultAdminUuid = '00000000-0000-0000-0000-000000000001';
+      await supabase.from('institutions').upsert({
+        id: DEFAULT_INSTITUTION_ID,
+        name: 'Apex Health & Medical Center',
+        domain: 'apexhealth.edu',
+        default_currency: 'INR',
+      });
+
+      await supabase.from('profiles').upsert({
+        id: defaultAdminUuid,
+        email: 'admin@campushealth.edu',
+        full_name: 'Dr. Sarah Chen, MD',
+        role: 'CLINICAL_ADMIN',
+        institution_id: DEFAULT_INSTITUTION_ID,
+        phone: '+91 98111 22334',
+        emergency_contact: 'Clinical Triage & Emergency Copay Desk',
+        alerts_enabled: true,
+      });
+      console.log(`👨‍⚕️ [Supabase] Seeded default Clinical Admin into profiles table.`);
+    }
+  } catch (e: any) {
+    console.warn('⚠️ [Supabase] syncDefaultAdmin notice:', e?.message);
+  }
+}
+syncDefaultAdminToSupabase();
 
 // Default Admin Account
 const DEFAULT_ADMIN = {
-  id: 'usr_adm_999',
+  id: '00000000-0000-0000-0000-000000000001',
   name: 'Dr. Sarah Chen, MD',
   email: 'admin@campushealth.edu',
   role: 'ADMIN',
@@ -84,58 +113,84 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
     const {
       adminEmail,
       password,
-      defaultStudentPassword = 'Student@123',
+      defaultStudentPassword = 'Patient@123',
       institutionName,
       institutionId,
+      department,
+      specialty,
+      phone,
+      adminPhone,
       students = [],
       csvContent,
     } = req.body;
 
     const email = (adminEmail || req.body.email || '').trim().toLowerCase();
-    const instName = (institutionName || req.body.instituteName || 'New University').trim();
+    const instName = (institutionName || req.body.instituteName || 'Apex Health Medical Center').trim();
     const instId = (institutionId || `inst-${Date.now()}`).trim().toLowerCase();
+    const adminSpecialty = (department || specialty || 'Clinical Triage & Emergency Copay Desk').trim();
+    const adminTel = (phone || adminPhone || '+91 98111 22334').trim();
 
     if (!email) {
       return res.status(400).json({ success: false, error: 'Admin email is required.' });
     }
 
-    // 1. Create Institution Record
+    // 1. Create Institution Record in Memory & Supabase
     const newInstitution = {
       id: instId,
       name: instName,
-      domain: email.split('@')[1] || 'institute.edu',
+      domain: email.split('@')[1] || 'apexhealth.edu',
+      default_currency: 'INR',
       createdAt: new Date().toISOString(),
     };
     INSTITUTIONS.set(instId, newInstitution);
 
+    try {
+      await supabase.from('institutions').upsert({
+        id: instId,
+        name: instName,
+        domain: email.includes('@') ? email.split('@')[1] : 'apexhealth.edu',
+        default_currency: 'INR',
+      });
+    } catch (instErr: any) {
+      console.warn('⚠️ [Supabase] Institution upsert notice:', instErr?.message);
+    }
+
     // 2. Create Admin User Profile & Persist to Supabase
     const adminUuid = uuidv4();
-    const adminName = (req.body.adminName || req.body.name || 'Clinical Administrator').trim();
+    const adminName = (req.body.adminName || req.body.name || 'Chief Medical Officer').trim();
 
     const adminUser = {
       id: adminUuid,
       name: adminName,
       email: email,
       role: 'ADMIN',
-      department: `${instName} Clinical Triage Desk`,
+      department: adminSpecialty,
       institutionId: instId,
+      phone: adminTel,
       token: `jwt_token_admin_${instId}_${Date.now()}`,
     };
     USER_STORE.set(email, adminUser);
     USER_STORE.set(adminUuid, adminUser);
 
     try {
-      await supabase.from('profiles').upsert({
+      const { error: profError } = await supabase.from('profiles').upsert({
         id: adminUuid,
         email: email,
         full_name: adminName,
         role: 'CLINICAL_ADMIN',
         institution_id: instId,
-        phone: req.body.phone || req.body.adminPhone || '+91 98111 22334',
+        phone: adminTel,
+        emergency_contact: adminSpecialty,
         alerts_enabled: true,
       });
-    } catch (profErr) {
-      console.warn('⚠️ [Supabase] Admin profile creation notice:', profErr);
+
+      if (profError) {
+        console.warn('⚠️ [Supabase] Admin profile creation notice:', profError.message);
+      } else {
+        console.log(`👨‍⚕️ [Supabase] Successfully stored Clinical Admin "${adminName}" (${email}) with specialty "${adminSpecialty}" at Institution "${instId}"!`);
+      }
+    } catch (profErr: any) {
+      console.warn('⚠️ [Supabase] Admin profile creation exception:', profErr?.message);
     }
 
     // 3. Parse CSV lines using Supabase `patient_rosters` table format or standard roster format

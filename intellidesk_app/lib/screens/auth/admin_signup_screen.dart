@@ -18,11 +18,13 @@ class AdminSignupScreen extends StatefulWidget {
 class _AdminSignupScreenState extends State<AdminSignupScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _instituteNameCtrl = TextEditingController(text: 'Stanford Medical Center & Campus Health');
+  final TextEditingController _instituteNameCtrl = TextEditingController(text: 'Apex Health & Medical Center');
   final TextEditingController _adminNameCtrl = TextEditingController(text: 'Dr. Sarah Chen, MD');
-  final TextEditingController _adminEmailCtrl = TextEditingController(text: 'admin@stanfordhealth.edu');
+  final TextEditingController _adminEmailCtrl = TextEditingController(text: 'admin@campushealth.edu');
   final TextEditingController _passwordCtrl = TextEditingController(text: 'admin123');
-  final TextEditingController _instCodeCtrl = TextEditingController(text: 'hosp-stanford-01');
+  final TextEditingController _instCodeCtrl = TextEditingController(text: 'inst-001');
+  final TextEditingController _specialtyCtrl = TextEditingController(text: 'Emergency Medicine & Chief Medical Officer');
+  final TextEditingController _phoneCtrl = TextEditingController(text: '+91 98111 22334');
   final TextEditingController _defaultStudentPasswordCtrl = TextEditingController(text: 'Patient@123');
   final TextEditingController _fundPoolCtrl = TextEditingController(text: '150000');
 
@@ -31,9 +33,9 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
   String? _csvFileName;
 
   static const String sampleCsvTemplate = '''id,institution_id,phone,name,email,emergency_contact
-PAT-2026-001,hosp-stanford-01,+91 98765 43210,Alex Rivera,alex.rivera@campushealth.edu,+91 98765 43211
-PAT-2026-002,hosp-stanford-01,+91 98111 22334,Jordan Miller,jordan.miller@campushealth.edu,+91 98111 22335
-PAT-2026-003,hosp-stanford-01,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+91 99223 34456''';
+PAT-2026-001,inst-001,+91 98765 43210,Alex Rivera,alex.rivera@campushealth.edu,+91 98765 43211
+PAT-2026-002,inst-001,+91 98111 22334,Jordan Miller,jordan.miller@campushealth.edu,+91 98111 22335
+PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+91 99223 34456''';
 
   @override
   void initState() {
@@ -50,6 +52,8 @@ PAT-2026-003,hosp-stanford-01,+91 99223 34455,Taylor Chen,taylor.chen@campusheal
     _adminEmailCtrl.dispose();
     _passwordCtrl.dispose();
     _instCodeCtrl.dispose();
+    _specialtyCtrl.dispose();
+    _phoneCtrl.dispose();
     _defaultStudentPasswordCtrl.dispose();
     _fundPoolCtrl.dispose();
     _csvRawCtrl.dispose();
@@ -160,6 +164,8 @@ PAT-2026-003,hosp-stanford-01,+91 99223 34455,Taylor Chen,taylor.chen@campusheal
       adminEmail: _adminEmailCtrl.text.trim(),
       password: _passwordCtrl.text.trim(),
       institutionCode: _instCodeCtrl.text.trim(),
+      department: _specialtyCtrl.text.trim(),
+      phone: _phoneCtrl.text.trim(),
       defaultStudentPassword: _defaultStudentPasswordCtrl.text.trim(),
       rosterStudents: _parsedStudents,
     );
@@ -355,9 +361,22 @@ PAT-2026-003,hosp-stanford-01,+91 99223 34455,Taylor Chen,taylor.chen@campusheal
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
+                                    controller: _specialtyCtrl,
+                                    decoration: _buildInputDeco('Clinical Specialty & Department', Icons.medical_services_outlined),
+                                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextFormField(
                                     controller: _adminEmailCtrl,
                                     keyboardType: TextInputType.emailAddress,
                                     decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined),
+                                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextFormField(
+                                    controller: _phoneCtrl,
+                                    keyboardType: TextInputType.phone,
+                                    decoration: _buildInputDeco('Official Admin Phone', Icons.phone_outlined),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
@@ -410,9 +429,30 @@ PAT-2026-003,hosp-stanford-01,+91 99223 34455,Taylor Chen,taylor.chen@campusheal
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: TextFormField(
+                                        controller: _specialtyCtrl,
+                                        decoration: _buildInputDeco('Clinical Specialty & Department', Icons.medical_services_outlined),
+                                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
                                         controller: _adminEmailCtrl,
                                         keyboardType: TextInputType.emailAddress,
                                         decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined),
+                                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: _phoneCtrl,
+                                        keyboardType: TextInputType.phone,
+                                        decoration: _buildInputDeco('Official Admin Phone', Icons.phone_outlined),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),

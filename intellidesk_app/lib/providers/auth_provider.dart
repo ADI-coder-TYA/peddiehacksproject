@@ -145,6 +145,8 @@ class AuthProvider extends ChangeNotifier {
     required String adminEmail,
     required String password,
     required String institutionCode,
+    String? department,
+    String? phone,
     required String defaultStudentPassword,
     required List<Map<String, String>> rosterStudents,
   }) async {
@@ -154,6 +156,8 @@ class AuthProvider extends ChangeNotifier {
       adminEmail: adminEmail,
       password: password,
       institutionId: institutionCode,
+      department: department,
+      phone: phone,
       defaultStudentPassword: defaultStudentPassword,
       students: rosterStudents.map((s) => Map<String, dynamic>.from(s)).toList(),
     );
@@ -165,8 +169,10 @@ class AuthProvider extends ChangeNotifier {
     required String adminName,
     required String adminEmail,
     required String password,
-    String defaultStudentPassword = 'Student@123',
+    String defaultStudentPassword = 'Patient@123',
     required String institutionId,
+    String? department,
+    String? phone,
     required List<Map<String, dynamic>> students,
     String? csvContent,
   }) async {
@@ -183,6 +189,8 @@ class AuthProvider extends ChangeNotifier {
           password: password,
           defaultStudentPassword: defaultStudentPassword,
           institutionId: institutionId,
+          department: department,
+          phone: phone,
           students: students,
           csvContent: csvContent,
         );
@@ -191,11 +199,11 @@ class AuthProvider extends ChangeNotifier {
           final adminData = Map<String, dynamic>.from(res['admin']);
           _user = UserProfile.fromJson(adminData);
         } else {
-          _createFallbackAdmin(instituteName, adminName, adminEmail, institutionId);
+          _createFallbackAdmin(instituteName, adminName, adminEmail, institutionId, department, phone);
         }
       } catch (backendError) {
         debugPrint('Backend registration error, fallback to local registration: $backendError');
-        _createFallbackAdmin(instituteName, adminName, adminEmail, institutionId);
+        _createFallbackAdmin(instituteName, adminName, adminEmail, institutionId, department, phone);
       }
 
       await _persistSession();
@@ -238,14 +246,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  void _createFallbackAdmin(String instituteName, String adminName, String adminEmail, String instId) {
+  void _createFallbackAdmin(String instituteName, String adminName, String adminEmail, String instId, [String? department, String? phone]) {
     _user = UserProfile(
       id: 'usr_adm_${DateTime.now().millisecondsSinceEpoch}',
-      name: adminName.isNotEmpty ? adminName : 'Institute Admin',
-      email: adminEmail.isNotEmpty ? adminEmail : 'admin@$instId.edu',
+      name: adminName.isNotEmpty ? adminName : 'Chief Medical Officer',
+      email: adminEmail.isNotEmpty ? adminEmail : 'admin@campushealth.edu',
       role: UserRole.admin,
-      department: instituteName,
+      department: department ?? '$instituteName Clinical Triage',
       institutionId: instId,
+      phone: phone ?? '+91 98111 22334',
       token: 'jwt_mock_token_admin_$instId',
     );
   }
