@@ -63,7 +63,6 @@ telemetryRouter.post('/funds/allocate', async (req: Request, res: Response) => {
         .from('health_funds')
         .update({
           total_allocated: newTotal,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', existingFund.id)
         .select()
