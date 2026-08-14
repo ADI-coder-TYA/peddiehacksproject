@@ -66,7 +66,7 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
       final auth = context.read<AuthProvider>();
       final patientPhone = _phoneController.text.trim().isNotEmpty
           ? _phoneController.text.trim()
-          : (auth.userProfile?.phone ?? '9876543210');
+          : (auth.user?.phone ?? '9876543210');
 
       String? mediaUrl;
       if (_pickedFile != null && _pickedFile!.bytes != null) {

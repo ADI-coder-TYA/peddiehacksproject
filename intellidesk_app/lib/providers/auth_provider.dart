@@ -14,6 +14,7 @@ class AuthProvider extends ChangeNotifier {
   static const String _sessionKey = 'intellidesk_auth_session';
 
   UserProfile? get user => _user;
+  UserProfile? get userProfile => _user;
   UserRole get role => _user?.role ?? UserRole.student;
   String? get token => _user?.token;
 
