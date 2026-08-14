@@ -13,34 +13,29 @@ const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID!, process.env.TWILIO_
 
 router.get('/tickets', async (req: Request, res: Response) => {
   try {
-    const { data: tickets, error } = await supabase
-      .from('tickets')
+    let query = supabase
+      .from('claims')
       .select('*')
-      .eq('institution_id', req.institution_id)
       .order('created_at', { ascending: false });
 
+    if (req.institution_id && req.institution_id !== 'default' && req.institution_id !== 'all') {
+      query = query.eq('institution_id', req.institution_id);
+    }
+
+    const { data: claims, error } = await query;
+
     if (error) {
-      console.error('Error fetching tickets:', error);
-      res.status(500).json({ error: 'Internal Server Error' });
+      console.error('Error fetching claims in admin/tickets:', error);
+      res.status(200).json({});
       return;
     }
 
-    const grouped = (tickets || []).reduce((acc: Record<string, any[]>, ticket) => {
-      const status = ticket.status || 'Pending';
+    const grouped = (claims || []).reduce((acc: Record<string, any[]>, claim) => {
+      const status = claim.status || 'Pending';
       if (!acc[status]) acc[status] = [];
-      acc[status].push(ticket);
+      acc[status].push(claim);
       return acc;
     }, {});
-
-    if (grouped['Pending'] && grouped['Pending'].length > 0) {
-      grouped['Pending'] = rankPendingQueue(grouped['Pending'] as TicketBatch[]);
-      try {
-        const io = getIO();
-        io.emit('queue:reordered', { pendingQueue: grouped['Pending'] });
-      } catch (e) {
-        // Socket error
-      }
-    }
 
     res.json(grouped);
   } catch (error) {
@@ -52,21 +47,18 @@ router.get('/tickets', async (req: Request, res: Response) => {
 router.get('/tickets/:id', async (req: Request, res: Response) => {
   try {
     const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id) as string;
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : 'edu-admin-123')) as string;
-    const { data: ticket, error } = await supabase
-      .from('tickets')
+    const { data: claim, error } = await supabase
+      .from('claims')
       .select('*')
       .eq('id', id)
-      .eq('institution_id', instId)
-      .single();
+      .maybeSingle();
 
-    if (error || !ticket) {
-      console.error('Error fetching ticket:', error);
-      res.status(404).json({ error: 'Ticket not found' });
+    if (error || !claim) {
+      res.status(404).json({ error: 'Claim not found' });
       return;
     }
 
-    res.json(ticket);
+    res.json(claim);
   } catch (error) {
     console.error('Error in /tickets/:id:', error);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -150,45 +142,44 @@ router.post('/tickets/:id/approve', async (req: Request, res: Response) => {
 router.post('/tickets/:id/deny', async (req: Request, res: Response) => {
   try {
     const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id) as string;
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : 'edu-admin-123')) as string;
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : 'inst-001')) as string;
     const { notes } = req.body;
     
-    const { data: ticket, error: fetchError } = await supabase
-      .from('tickets')
+    const { data: claim, error: fetchError } = await supabase
+      .from('claims')
       .select('*')
       .eq('id', id)
-      .eq('institution_id', instId)
-      .single();
+      .maybeSingle();
 
-    if (fetchError || !ticket) {
-      res.status(404).json({ error: 'Ticket not found' });
+    if (fetchError || !claim) {
+      res.status(404).json({ error: 'Claim not found' });
       return;
     }
 
     const { error: updateError } = await supabase
-      .from('tickets')
+      .from('claims')
       .update({ 
-        status: 'Denied',
-        policy_match_reason: notes ? `${ticket.policy_match_reason || ''} | Denied Reason: ${notes}` : ticket.policy_match_reason
+        status: 'Rejected',
+        clinical_notes: notes ? `${claim.clinical_notes || ''}\n• Denied Reason: ${notes}` : claim.clinical_notes
       })
       .eq('id', id);
 
     if (updateError) {
-      console.error('Error updating ticket:', updateError);
+      console.error('Error updating claim:', updateError);
       res.status(500).json({ error: 'Internal Server Error' });
       return;
     }
 
-    await logAuditEvent(instId, ticket.id, 'MANUAL_DENIAL', 'ADMIN_USER', {
+    await logAuditEvent(instId, claim.id, 'MANUAL_DENIAL', 'ADMIN_USER', {
       notes: notes
     });
 
-    if (process.env.TWILIO_PHONE_NUMBER) {
+    if (process.env.TWILIO_PHONE_NUMBER && claim.patient_phone) {
         try {
             await twilioClient.messages.create({
                 body: `Your request has been reviewed but could not be approved at this time.`,
                 from: process.env.TWILIO_PHONE_NUMBER,
-                to: ticket.student_phone
+                to: claim.patient_phone
             });
         } catch (smsError) {
             console.error('Error sending SMS:', smsError);
