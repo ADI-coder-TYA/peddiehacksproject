@@ -219,12 +219,29 @@ class TelemetryProvider extends ChangeNotifier {
     });
   }
 
+  bool _isDisposed = false;
+
   void retry() {
+    if (_isDisposed) return;
     _socket.disconnect();
     _socket.connect();
     _hasError = false;
     _errorMessage = null;
     notifyListeners();
+  }
+
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    _socket.dispose();
+    super.dispose();
   }
 }
 

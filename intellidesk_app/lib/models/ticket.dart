@@ -21,6 +21,7 @@ class Ticket {
   final double sentimentNegativeScore;
   final double multiDepartmentInvolvement;
   final double policyAmbiguityScore;
+  final String? fraudStatus;
   // Payout & Disbursement Info
   final String? payoutReference;
   final String? payoutMethod;
@@ -49,6 +50,7 @@ class Ticket {
     this.sentimentNegativeScore = 0.0,
     this.multiDepartmentInvolvement = 0.0,
     this.policyAmbiguityScore = 0.0,
+    this.fraudStatus,
     this.payoutReference,
     this.payoutMethod,
     this.voucherCode,
@@ -94,6 +96,7 @@ class Ticket {
       sentimentNegativeScore: parseDouble(json['sentiment_negative_score']),
       multiDepartmentInvolvement: parseDouble(json['multi_department_involvement']),
       policyAmbiguityScore: parseDouble(json['policy_ambiguity_score']),
+      fraudStatus: json['fraud_status']?.toString() ?? ((json['flag_reason'] != null || (parseNullableDouble(json['anomaly_reconstruction_score'] ?? json['anomaly_score']) ?? 0) > 0.65) ? 'FLAGGED' : 'CLEARED'),
       payoutReference: json['payout_reference']?.toString() ?? json['transaction_reference']?.toString() ?? json['voucher_code']?.toString(),
       payoutMethod: json['payout_method']?.toString() ?? json['disbursement_method']?.toString(),
       voucherCode: json['voucher_code']?.toString(),
@@ -124,6 +127,7 @@ class Ticket {
       'sentiment_negative_score': sentimentNegativeScore,
       'multi_department_involvement': multiDepartmentInvolvement,
       'policy_ambiguity_score': policyAmbiguityScore,
+      'fraud_status': fraudStatus,
       'payout_reference': payoutReference,
       'payout_method': payoutMethod,
       'voucher_code': voucherCode,

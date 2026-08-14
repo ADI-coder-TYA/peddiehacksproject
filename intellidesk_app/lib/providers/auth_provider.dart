@@ -222,6 +222,8 @@ class AuthProvider extends ChangeNotifier {
     );
   }
 
+  Future<void> signOut() => logout();
+
   /// Logout and clear saved authentication session
   Future<void> logout() async {
     _user = null;

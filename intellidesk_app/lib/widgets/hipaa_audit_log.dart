@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 
 class HipaaAuditLogEntry {
   final String ticketId;
@@ -14,10 +12,16 @@ class HipaaAuditLogEntry {
     required this.action,
     required this.actor,
     required this.timestamp,
-  }) : hash = sha256
-            .convert(utf8.encode('$ticketId|$action|$actor|${timestamp.toIso8601String()}'))
-            .toString()
-            .substring(0, 12);
+  }) : hash = _generateHash('$ticketId|$action|$actor|${timestamp.toIso8601String()}');
+
+  static String _generateHash(String input) {
+    int hash = 0xcbf29ce484222325;
+    for (int i = 0; i < input.length; i++) {
+      hash ^= input.codeUnitAt(i);
+      hash = (hash * 0x100000001b3) & 0xFFFFFFFFFFFFFFFF;
+    }
+    return hash.toRadixString(16).padLeft(16, '0').substring(0, 12);
+  }
 }
 
 class HipaaAuditLogList extends StatelessWidget {

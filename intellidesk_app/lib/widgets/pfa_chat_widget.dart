@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../widgets/clinical_widgets.dart';
 
 class PfaQuickPrompt {
   final String label;

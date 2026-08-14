@@ -68,7 +68,7 @@ class HealthProfileScreen extends StatelessWidget {
             leading: const Icon(Icons.logout, color: Color(0xFFEF4444)),
             title: const Text('Sign Out',
                 style: TextStyle(color: Color(0xFFEF4444))),
-            onTap: () => auth.signOut(),
+            onTap: () => auth.logout(),
           ),
         ],
       ),
