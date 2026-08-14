@@ -310,11 +310,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: () {
-                                    auth.loginAsStudent();
+                                    auth.loginAsPatient();
                                   },
                                   icon: const Icon(Icons.person, size: 16, color: Color(0xFF0D9488)),
                                   label: const Text(
-                                    'Patient / Student\n(Alex Rivera)',
+                                    'Patient / Member\n(Alex Rivera)',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, height: 1.2),
                                   ),

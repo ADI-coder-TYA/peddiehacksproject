@@ -8,7 +8,7 @@ import 'providers/accessibility_provider.dart';
 import 'providers/preferences_provider.dart';
 import 'offline_sync_engine.dart';
 import 'screens/auth/login_screen.dart';
-import 'screens/student/student_main_screen.dart';
+import 'screens/patient/patient_main_screen.dart';
 import 'screens/admin/admin_main_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as io;
@@ -127,7 +127,7 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Dynamic Auth Gate routing between Login Screen, Student Portal, and Admin Portal.
+/// Dynamic Auth Gate routing between Login Screen, Patient Health Portal, and Admin Portal.
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
@@ -139,11 +139,11 @@ class AuthGate extends StatelessWidget {
       return const LoginScreen();
     }
 
-    if (auth.isStudent) {
-      return const StudentMainScreen();
+    if (auth.isPatient) {
+      return const PatientMainScreen();
     }
 
-    // Default to Admin Portal for Admin or Auditor roles
+    // Default to Clinical Admin Portal
     return const AdminMainScreen();
   }
 }
