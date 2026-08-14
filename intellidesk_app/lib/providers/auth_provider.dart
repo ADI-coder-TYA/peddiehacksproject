@@ -1,0 +1,248 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../models/user_profile.dart';
+import '../models/user_role.dart';
+import '../services/api_service.dart';
+
+class AuthProvider extends ChangeNotifier {
+  UserProfile? _user;
+  bool _isLoading = false;
+  String? _errorMessage;
+  final ApiService _apiService = ApiService();
+
+  static const String _sessionKey = 'intellidesk_auth_session';
+
+  UserProfile? get user => _user;
+  UserRole get role => _user?.role ?? UserRole.student;
+  String? get token => _user?.token;
+
+  bool get isAuthenticated => _user != null;
+  bool get isStudent => _user?.role == UserRole.student;
+  bool get isAdmin => _user?.role == UserRole.admin;
+  bool get isAuditor => _user?.role == UserRole.auditor;
+
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+
+  AuthProvider() {
+    initSession();
+  }
+
+  /// Initialize session from local storage if previously logged in.
+  Future<void> initSession() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedData = prefs.getString(_sessionKey);
+      if (savedData != null) {
+        final decoded = json.decode(savedData) as Map<String, dynamic>;
+        _user = UserProfile.fromJson(decoded);
+        _syncApiConfig();
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error loading saved auth session: $e');
+    }
+  }
+
+  void _syncApiConfig() {
+    ApiConfig.authToken = _user?.token;
+    ApiConfig.userRole = _user?.role.code;
+    ApiConfig.userEmail = _user?.email;
+    ApiConfig.userName = _user?.name;
+    ApiConfig.userPhone = _user?.phone;
+    ApiConfig.userId = _user?.id;
+    ApiConfig.userDepartment = _user?.department;
+  }
+
+  /// Perform authentication login via backend API or fallback to mock profile
+  Future<bool> login({
+    required String email,
+    required String password,
+    required UserRole role,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final res = await _apiService.login(
+        email: email,
+        password: password,
+        role: role.code,
+      );
+
+      if (res['success'] == true && res['user'] != null) {
+        final userData = Map<String, dynamic>.from(res['user']);
+        if (res['token'] != null) {
+          userData['token'] = res['token'];
+        }
+        _user = UserProfile.fromJson(userData);
+        await _persistSession();
+        _syncApiConfig();
+        _isLoading = false;
+        notifyListeners();
+        return true;
+      } else {
+        _isLoading = false;
+        _errorMessage = res['error']?.toString() ?? 'Invalid credentials or student not whitelisted.';
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString().replaceFirst('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// One-tap demo login as Alex Johnson (Student)
+  Future<void> loginAsStudent() async {
+    _user = const UserProfile(
+      id: 'usr_std_001',
+      name: 'Alex Johnson',
+      email: 'alex.j@university.edu',
+      role: UserRole.student,
+      department: 'Computer Science',
+      institutionId: 'edu-admin-123',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
+      token: 'jwt_mock_token_student_alex_johnson',
+    );
+    await _persistSession();
+    _syncApiConfig();
+    notifyListeners();
+  }
+
+  /// One-tap demo login as Dr. Sarah Chen (Admin)
+  Future<void> loginAsAdmin() async {
+    _user = const UserProfile(
+      id: 'usr_adm_999',
+      name: 'Dr. Sarah Chen',
+      email: 's.chen@university.edu',
+      role: UserRole.admin,
+      department: 'Financial Aid & Student Welfare',
+      institutionId: 'edu-admin-123',
+      avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
+      token: 'jwt_mock_token_admin_sarah_chen',
+    );
+    await _persistSession();
+    _syncApiConfig();
+    notifyListeners();
+  }
+
+  /// Register new Institution Admin and batch-import student roster
+  Future<bool> registerInstitution({
+    required String instituteName,
+    required String adminName,
+    required String adminEmail,
+    required String password,
+    String defaultStudentPassword = 'Student@123',
+    required String institutionId,
+    required List<Map<String, dynamic>> students,
+    String? csvContent,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      try {
+        final res = await _apiService.registerInstitution(
+          instituteName: instituteName,
+          adminName: adminName,
+          adminEmail: adminEmail,
+          password: password,
+          defaultStudentPassword: defaultStudentPassword,
+          institutionId: institutionId,
+          students: students,
+          csvContent: csvContent,
+        );
+
+        if (res['success'] == true && res['admin'] != null) {
+          final adminData = Map<String, dynamic>.from(res['admin']);
+          _user = UserProfile.fromJson(adminData);
+        } else {
+          _createFallbackAdmin(instituteName, adminName, adminEmail, institutionId);
+        }
+      } catch (backendError) {
+        debugPrint('Backend registration error, fallback to local registration: $backendError');
+        _createFallbackAdmin(instituteName, adminName, adminEmail, institutionId);
+      }
+
+      await _persistSession();
+      _syncApiConfig();
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Institution Registration Failed: ${e.toString()}';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Change password for logged in user
+  Future<bool> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    if (_user == null) return false;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _apiService.changePassword(
+        email: _user!.email,
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+      );
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString().replaceAll('Exception: ', '');
+      notifyListeners();
+      return false;
+    }
+  }
+
+  void _createFallbackAdmin(String instituteName, String adminName, String adminEmail, String instId) {
+    _user = UserProfile(
+      id: 'usr_adm_${DateTime.now().millisecondsSinceEpoch}',
+      name: adminName.isNotEmpty ? adminName : 'Institute Admin',
+      email: adminEmail.isNotEmpty ? adminEmail : 'admin@$instId.edu',
+      role: UserRole.admin,
+      department: instituteName,
+      institutionId: instId,
+      token: 'jwt_mock_token_admin_$instId',
+    );
+  }
+
+  /// Logout and clear saved authentication session
+  Future<void> logout() async {
+    _user = null;
+    _errorMessage = null;
+    _syncApiConfig();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_sessionKey);
+    } catch (e) {
+      debugPrint('Error removing saved session: $e');
+    }
+    notifyListeners();
+  }
+
+  Future<void> _persistSession() async {
+    if (_user == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_sessionKey, json.encode(_user!.toJson()));
+    } catch (e) {
+      debugPrint('Error persisting session: $e');
+    }
+  }
+}

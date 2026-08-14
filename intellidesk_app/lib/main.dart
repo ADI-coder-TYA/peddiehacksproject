@@ -1,0 +1,145 @@
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'providers/auth_provider.dart';
+import 'providers/ticket_provider.dart';
+import 'providers/job_tracking_manager.dart';
+import 'providers/accessibility_provider.dart';
+import 'providers/preferences_provider.dart';
+import 'chat_provider.dart';
+import 'offline_sync_engine.dart';
+import 'screens/auth/login_screen.dart';
+import 'screens/student/student_main_screen.dart';
+import 'screens/admin/admin_main_screen.dart';
+import 'package:http/http.dart' as http;
+import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'config/api_config.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService.initialize();
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => PreferencesProvider()),
+        ChangeNotifierProvider(create: (_) => AccessibilityProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => TicketProvider()),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
+        ChangeNotifierProvider(create: (_) => OfflineQueueManager()),
+        ChangeNotifierProvider(create: (_) => JobTrackingManager(
+          socket: io.io(ApiConfig.socketUrl, io.OptionBuilder().setTransports(['websocket']).build()),
+          httpClient: http.Client(),
+          apiBaseUrl: ApiConfig.host,
+        )),
+      ],
+      child: const MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = context.watch<PreferencesProvider>();
+    final isHighContrast = prefs.isHighContrast;
+
+    return MaterialApp(
+      title: 'MedAccess AI',
+      debugShowCheckedModeBanner: false,
+      theme: isHighContrast
+          ? ThemeData(
+              brightness: Brightness.dark,
+              scaffoldBackgroundColor: Colors.black,
+              primaryColor: const Color(0xFF0D9488), // Deep Clinical Teal
+              cardColor: Colors.black,
+              colorScheme: const ColorScheme.dark(
+                primary: Color(0xFF00F0FF), // WCAG AAA Cyan
+                secondary: Color(0xFFFFD600), // AAA Amber
+                surface: Colors.black,
+                error: Color(0xFFEF4444), // Urgent Coral
+              ),
+              cardTheme: const CardThemeData(
+                color: Colors.black,
+                shape: RoundedRectangleBorder(
+                  side: BorderSide(color: Color(0xFF00F0FF), width: 2.0),
+                ),
+              ),
+              outlinedButtonTheme: OutlinedButtonThemeData(
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF00F0FF), width: 2.0),
+                  foregroundColor: const Color(0xFF00F0FF),
+                ),
+              ),
+              textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).copyWith(
+                bodyLarge: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                bodyMedium: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 14),
+                titleLarge: const TextStyle(color: Color(0xFF00F0FF), fontWeight: FontWeight.w900, fontSize: 20),
+              ),
+              useMaterial3: true,
+            )
+          : ThemeData(
+              brightness: Brightness.light,
+              scaffoldBackgroundColor: const Color(0xFFF8FAFC), // Subtle Slate Tint
+              primaryColor: const Color(0xFF0D9488), // Deep Clinical Teal
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              hoverColor: Colors.transparent,
+              colorScheme: const ColorScheme.light(
+                primary: Color(0xFF0D9488), // Deep Clinical Teal
+                primaryContainer: Color(0xFF0F766E), // Dark Clinical Teal
+                secondary: Color(0xFF0284C7), // Soft Cyan / Sky Wellness
+                secondaryContainer: Color(0xFF38BDF8),
+                surface: Color(0xFFFFFFFF), // Clean Medical White
+                error: Color(0xFFEF4444), // Urgent Coral
+                surfaceContainerHighest: Color(0xFFF1F5F9),
+              ),
+              textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme).copyWith(
+                headlineLarge: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                headlineMedium: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                headlineSmall: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, letterSpacing: -0.5),
+                titleLarge: const TextStyle(color: Color(0xFF0F172A), fontWeight: FontWeight.w700, letterSpacing: -0.5),
+              ),
+              appBarTheme: const AppBarTheme(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                foregroundColor: Color(0xFF0F172A),
+              ),
+              pageTransitionsTheme: const PageTransitionsTheme(
+                builders: {
+                  TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+                  TargetPlatform.iOS: FadeUpwardsPageTransitionsBuilder(),
+                  TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
+                  TargetPlatform.macOS: FadeUpwardsPageTransitionsBuilder(),
+                },
+              ),
+              useMaterial3: true,
+            ),
+      home: const AuthGate(),
+    );
+  }
+}
+
+/// Dynamic Auth Gate routing between Login Screen, Student Portal, and Admin Portal.
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
+    if (!auth.isAuthenticated) {
+      return const LoginScreen();
+    }
+
+    if (auth.isStudent) {
+      return const StudentMainScreen();
+    }
+
+    // Default to Admin Portal for Admin or Auditor roles
+    return const AdminMainScreen();
+  }
+}
