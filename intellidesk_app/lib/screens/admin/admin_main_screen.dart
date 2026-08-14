@@ -8,6 +8,7 @@ import '../../widgets/kanban_board.dart';
 import '../../admin_telemetry_dashboard_screen.dart';
 import '../../admin_compliance_audit_screen.dart';
 import '../../admin_emergency_war_room_screen.dart';
+import 'admin_war_room_screen.dart';
 import '../../admin_knowledge_base_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../../widgets/boutique_background.dart';
@@ -166,7 +167,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
       case 2:
         return const AdminComplianceAuditScreen();
       case 3:
-        return const EmergencyWarRoomScreen();
+        return const AdminWarRoomScreen();
       case 4:
         return const AdminKnowledgeBaseScreen();
       case 5:

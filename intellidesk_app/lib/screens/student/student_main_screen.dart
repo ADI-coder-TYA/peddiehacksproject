@@ -5,11 +5,11 @@ import '../../models/user_role.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/ticket_provider.dart';
 import '../../student_intake_tracker_screen.dart';
-import '../../student_crisis_chat_screen.dart';
-import '../../student_async_job_progress_screen.dart';
 import '../profile/user_profile_screen.dart';
 import '../../widgets/boutique_background.dart';
 import '../../widgets/role_guard.dart';
+import '../patient/clinical_chat_screen.dart';
+import '../patient/claim_status_screen.dart';
 
 class StudentMainScreen extends StatefulWidget {
   const StudentMainScreen({super.key});
@@ -90,7 +90,7 @@ class _StudentMainScreenState extends State<StudentMainScreen> {
                                         NavigationRailDestination(
                                           icon: Icon(Icons.psychology_outlined),
                                           selectedIcon: Icon(Icons.psychology),
-                                          label: Text('AI Advisor'),
+                                          label: Text('AI Counselor'),
                                         ),
                                         NavigationRailDestination(
                                           icon: Icon(Icons.receipt_long_outlined),
@@ -127,13 +127,9 @@ class _StudentMainScreenState extends State<StudentMainScreen> {
       case 0:
         return const StudentIntakeTrackerScreen();
       case 1:
-        return const StudentCrisisChatScreen();
+        return const ClinicalChatScreen();
       case 2:
-        return AsyncJobProgressScreen(onMinimize: () {
-          setState(() {
-            _selectedIndex = 0;
-          });
-        });
+        return const ClaimStatusScreen(claimId: 'CLM-DEMO-01');
       case 3:
         return const UserProfileScreen();
       default:
