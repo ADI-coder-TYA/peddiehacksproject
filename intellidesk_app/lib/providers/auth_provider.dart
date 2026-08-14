@@ -19,7 +19,8 @@ class AuthProvider extends ChangeNotifier {
   String? get token => _user?.token;
 
   bool get isAuthenticated => _user != null;
-  bool get isStudent => _user?.role == UserRole.student;
+  bool get isPatient => _user?.role.isPatient ?? true;
+  bool get isStudent => isPatient;
   bool get isAdmin => _user?.role == UserRole.admin;
   bool get isAuditor => _user?.role == UserRole.auditor;
 
@@ -86,7 +87,7 @@ class AuthProvider extends ChangeNotifier {
         return true;
       } else {
         _isLoading = false;
-        _errorMessage = res['error']?.toString() ?? 'Invalid credentials or student not whitelisted.';
+        _errorMessage = res['error']?.toString() ?? 'Invalid credentials or patient not registered.';
         notifyListeners();
         return false;
       }
@@ -98,32 +99,37 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  /// One-tap demo login as Alex Johnson (Student)
-  Future<void> loginAsStudent() async {
+  /// One-tap demo login as Alex Rivera (Patient / Member)
+  Future<void> loginAsPatient() async {
     _user = const UserProfile(
-      id: 'usr_std_001',
-      name: 'Alex Johnson',
-      email: 'alex.j@university.edu',
-      role: UserRole.student,
-      department: 'Computer Science',
-      institutionId: 'edu-admin-123',
+      id: 'usr_pat_001',
+      name: 'Alex Rivera',
+      email: 'alex.rivera@campushealth.edu',
+      role: UserRole.patient,
+      department: 'General Health & Outpatient Care',
+      institutionId: 'hosp-stanford-01',
+      phone: '+91 98765 43210',
       avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
-      token: 'jwt_mock_token_student_alex_johnson',
+      token: 'jwt_mock_token_patient_alex_rivera',
     );
     await _persistSession();
     _syncApiConfig();
     notifyListeners();
   }
 
-  /// One-tap demo login as Dr. Sarah Chen (Admin)
+  /// Backward compatibility alias
+  Future<void> loginAsStudent() => loginAsPatient();
+
+  /// One-tap demo login as Dr. Sarah Chen (Chief Medical Officer)
   Future<void> loginAsAdmin() async {
     _user = const UserProfile(
       id: 'usr_adm_999',
-      name: 'Dr. Sarah Chen',
-      email: 's.chen@university.edu',
+      name: 'Dr. Sarah Chen, MD',
+      email: 'dr.chen@medaccess.ai',
       role: UserRole.admin,
-      department: 'Financial Aid & Student Welfare',
-      institutionId: 'edu-admin-123',
+      department: 'Clinical Triage & Emergency Copay Desk',
+      institutionId: 'hosp-stanford-01',
+      phone: '+91 98111 22334',
       avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
       token: 'jwt_mock_token_admin_sarah_chen',
     );

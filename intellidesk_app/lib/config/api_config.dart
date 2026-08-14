@@ -34,18 +34,21 @@ class ApiConfig {
   static String preferredContactChannel = 'Email';
   static String selectedLanguage = 'English';
 
-  /// Returns standard headers for student requests
-  static Map<String, String> get studentHeaders {
+  /// Returns standard headers for patient / member requests
+  static Map<String, String> get patientHeaders {
     final headers = <String, String>{
       'Content-Type': 'application/json',
       'x-institution-id': institutionId,
-      'x-user-role': userRole ?? 'STUDENT',
+      'x-user-role': userRole ?? 'PATIENT',
       if (authToken != null) 'Authorization': 'Bearer $authToken',
     };
     if (userEmail != null) headers['x-user-email'] = userEmail!;
     if (userName != null) headers['x-user-name'] = userName!;
     return headers;
   }
+
+  /// Backward compatibility alias
+  static Map<String, String> get studentHeaders => patientHeaders;
 
   /// Returns standard headers for admin JSON API requests
   static Map<String, String> get adminHeaders {
