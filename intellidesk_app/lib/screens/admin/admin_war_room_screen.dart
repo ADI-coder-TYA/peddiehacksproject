@@ -215,7 +215,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) {
-        return Padding(
+        return SingleChildScrollView(
           padding: EdgeInsets.only(
             top: 20,
             left: 20,
@@ -229,10 +229,14 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Claim #${_safeClaimId(claim['id'])}',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  Flexible(
+                    child: Text(
+                      'Claim #${_safeClaimId(claim['id'])}',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -284,7 +288,7 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
                   decoration: BoxDecoration(
                     color: const Color(0xFFFEF2F2),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.emergencyRed.withOpacity(0.3)),
+                    border: Border.all(color: AppTheme.emergencyRed.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
@@ -413,8 +417,8 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
   Widget _buildKpiCard(String label, String value, Color color) {
     return Expanded(
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.symmetric(horizontal: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
         decoration: BoxDecoration(
           color: AppTheme.surfaceSlate,
           borderRadius: BorderRadius.circular(8),
@@ -422,10 +426,20 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+            ),
             const SizedBox(height: 2),
-            Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.textMuted), maxLines: 1),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 9, color: AppTheme.textMuted),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
       ),
@@ -451,31 +465,49 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
         return Card(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             leading: CircleAvatar(
               backgroundColor: color.withValues(alpha: 0.15),
               child: Icon(Icons.local_hospital, color: color, size: 20),
             ),
-            title: Row(
+            title: Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 6,
+              runSpacing: 4,
               children: [
                 Text(
                   'Claim #${_safeClaimId(c['id'])}',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
-                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(4)),
-                  child: Text(esi.replaceFirst('ESI_', 'ESI '), style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    esi.replaceFirst('ESI_', 'ESI ').replaceAll('_', ' '), 
+                    style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
-            subtitle: Text(
-              '${c['clinical_category']} • ₹${c['extracted_bill_amount'] ?? '0'}',
-              style: const TextStyle(fontSize: 12),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Text(
+                '${c['clinical_category']} • ₹${c['extracted_bill_amount'] ?? '0'}',
+                style: const TextStyle(fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            trailing: Chip(
-              label: Text(status, style: const TextStyle(fontSize: 11, color: Colors.white)),
-              backgroundColor: status == 'Disbursed' ? AppTheme.primaryBrand : (status == 'Flagged' ? AppTheme.emergencyRed : AppTheme.accentCyan),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: status == 'Disbursed' ? AppTheme.primaryBrand : (status == 'Flagged' ? AppTheme.emergencyRed : AppTheme.accentCyan),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                status,
+                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+              ),
             ),
             onTap: () => _showClaimDetails(c),
           ),
