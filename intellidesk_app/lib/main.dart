@@ -6,7 +6,7 @@ import 'providers/ticket_provider.dart';
 import 'providers/job_tracking_manager.dart';
 import 'providers/accessibility_provider.dart';
 import 'providers/preferences_provider.dart';
-import 'offline_sync_engine.dart';
+import 'services/offline_sync_engine.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/patient/patient_main_screen.dart';
 import 'screens/admin/admin_main_screen.dart';

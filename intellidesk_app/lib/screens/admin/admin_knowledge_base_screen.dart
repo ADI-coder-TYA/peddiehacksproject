@@ -11,8 +11,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import 'widgets/glass_card.dart';
-import 'config/api_config.dart';
+import '../../widgets/glass_card.dart';
+import '../../config/api_config.dart';
 
 // ─── Model ───────────────────────────────────────────────────
 

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../providers/ticket_provider.dart';
-import '../models/ticket.dart';
-import 'utils/currency_formatter.dart';
-import 'widgets/glass_card.dart';
+import '../../providers/ticket_provider.dart';
+import '../../models/ticket.dart';
+import '../../utils/currency_formatter.dart';
+import '../../widgets/glass_card.dart';
 
 class AdminComplianceAuditScreen extends StatefulWidget {
   const AdminComplianceAuditScreen({super.key});

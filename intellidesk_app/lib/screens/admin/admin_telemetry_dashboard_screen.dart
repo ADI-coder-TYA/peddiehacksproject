@@ -6,10 +6,10 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:http/http.dart' as http;
-import 'services/api_service.dart';
-import 'widgets/glass_card.dart';
-import 'widgets/stress_test_modal.dart';
-import 'utils/currency_formatter.dart';
+import '../../services/api_service.dart';
+import '../../widgets/glass_card.dart';
+import '../../widgets/stress_test_modal.dart';
+import '../../utils/currency_formatter.dart';
 
 // ============================================================================
 // 1. Data Models
