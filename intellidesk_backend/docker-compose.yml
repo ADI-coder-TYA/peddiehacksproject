@@ -1,0 +1,48 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: intellidesk_redis
+    volumes:
+      - redis_data:/data
+    networks:
+      - intellidesk-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build: .
+    container_name: intellidesk_api
+    command: node dist/src/server.js
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_PHONE_NUMBER=${TWILIO_PHONE_NUMBER}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_CLIENT_EMAIL=${FIREBASE_CLIENT_EMAIL}
+      - FIREBASE_PRIVATE_KEY=${FIREBASE_PRIVATE_KEY}
+    volumes:
+      - ./models:/app/models
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - intellidesk-net
+
+networks:
+  intellidesk-net:
+    driver: bridge
+
+volumes:
+  redis_data:
