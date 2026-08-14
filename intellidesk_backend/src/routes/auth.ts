@@ -145,15 +145,31 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
     INSTITUTIONS.set(instId, newInstitution);
 
     try {
-      await supabase.from('institutions').upsert({
+      const { error: instError } = await supabase.from('institutions').upsert({
         id: instId,
         name: instName,
         domain: email.includes('@') ? email.split('@')[1] : 'apexhealth.edu',
         default_currency: 'INR',
       });
+      if (instError) {
+        console.error('⚠️ [Supabase] Failed to upsert institution into institutions table:', instError.message);
+      } else {
+        console.log(`🏥 [Supabase] Successfully upserted institution "${instName}" (${instId})`);
+      }
     } catch (instErr: any) {
       console.warn('⚠️ [Supabase] Institution upsert notice:', instErr?.message);
     }
+
+    // Provision default health fund pool for this institution
+    try {
+      await supabase.from('health_funds').upsert({
+        institution_id: instId,
+        fund_name: `${instName} Emergency Health Relief Fund`,
+        total_pool: Number(req.body.fundPool || req.body.initialFundPool || 150000.0),
+        total_disbursed: 0.0,
+        currency: 'INR',
+      });
+    } catch (_) {}
 
     // 2. Create Admin User Profile & Persist to Supabase
     const adminUuid = uuidv4();
@@ -204,7 +220,6 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
 
         // Dynamic Header Mapping
         let idIdx = header.findIndex((h) => h === 'patient_id' || h === 'id' || h === 'student_id' || h === 'member_id');
-        let instIdx = header.findIndex((h) => h === 'institution_id' || h === 'institutionid');
         let phoneIdx = header.findIndex((h) => h === 'phone' || h === 'phone_number' || h === 'contact');
         let nameIdx = header.findIndex((h) => h === 'full_name' || h === 'name' || h === 'patient_name' || h === 'student_name');
         let firstNameIdx = header.findIndex((h) => h === 'first_name' || h === 'firstname');
@@ -231,7 +246,7 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
             rosterList.push({
               patient_id: idIdx >= 0 && idIdx < parts.length ? parts[idIdx] : parts[0],
               student_id: idIdx >= 0 && idIdx < parts.length ? parts[idIdx] : parts[0],
-              institution_id: instIdx >= 0 && instIdx < parts.length ? parts[instIdx] : instId,
+              institution_id: instId,
               phone: phoneIdx >= 0 && phoneIdx < parts.length ? parts[phoneIdx] : '',
               name: name || '',
               full_name: name || '',
@@ -255,7 +270,7 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
 
       const rosterEntry = {
         id: `rst_${Date.now()}_${whitelistedCount}`,
-        institution_id: st.institution_id || instId,
+        institution_id: instId,
         patient_id: stId,
         student_id: stId,
         email: stEmail,
@@ -273,7 +288,7 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
       if (stId) STUDENT_ROSTERS.set(stId.toLowerCase(), rosterEntry);
 
       supabaseRosterRows.push({
-        institution_id: st.institution_id || instId,
+        institution_id: instId,
         patient_id: stId,
         email: stEmail || null,
         phone: stPhone || null,
@@ -297,24 +312,8 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
       }
     }
 
-    // Also persist facility into institutions and health_funds table in Supabase
-    try {
-      await supabase.from('institutions').upsert({
-        id: instId,
-        name: instName,
-        domain: adminEmail.includes('@') ? adminEmail.split('@')[1] : 'hospital.org',
-      });
-      await supabase.from('health_funds').upsert({
-        institution_id: instId,
-        fund_name: `${instName} Emergency Health Relief Fund`,
-        total_pool: 150000.0,
-        total_disbursed: 0.0,
-        currency: 'INR',
-      });
-    } catch (_) {}
-
     // Telemetry Log
-    console.log(`🏢 [Tenant Engine] Created Healthcare Facility "${instName}" | Provisioned ${whitelistedCount} patients with default password "${defaultStudentPassword}"`);
+    console.log(`🏢 [Tenant Engine] Created Healthcare Facility "${instName}" (${instId}) | Provisioned ${whitelistedCount} patients with default password "${defaultStudentPassword}"`);
 
     return res.status(201).json({
       success: true,
@@ -332,7 +331,8 @@ router.post('/admin/register-tenant', async (req: Request, res: Response) => {
 
 // Alias route for backward compatibility
 router.post('/register-institution', (req: Request, res: Response) => {
-  return (router as any).handle({ ...req, url: '/admin/register-tenant', method: 'POST' }, res);
+  req.url = '/admin/register-tenant';
+  (router as any).handle(req, res);
 });
 
 /**
@@ -341,9 +341,19 @@ router.post('/register-institution', (req: Request, res: Response) => {
  */
 router.post('/roster/import', async (req: Request, res: Response) => {
   try {
-    const institutionId = req.body.institutionId || req.body.institution_id || req.headers['x-institution-id'] || 'default';
+    const institutionId = (req.body.institutionId || req.body.institution_id || req.headers['x-institution-id'] || 'inst-001').trim();
     const { csvContent, roster } = req.body;
     const itemsToInsert: any[] = [];
+
+    // Ensure institution exists in institutions table first
+    try {
+      await supabase.from('institutions').upsert({
+        id: institutionId,
+        name: req.body.institutionName || `Healthcare Facility (${institutionId})`,
+        domain: 'apexhealth.edu',
+        default_currency: 'INR',
+      });
+    } catch (_) {}
 
     if (csvContent && typeof csvContent === 'string') {
       const lines = csvContent.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
@@ -372,7 +382,7 @@ router.post('/roster/import', async (req: Request, res: Response) => {
     } else if (Array.isArray(roster) && roster.length > 0) {
       roster.forEach((r: any, idx: number) => {
         itemsToInsert.push({
-          institution_id: r.institutionId || r.institution_id || institutionId,
+          institution_id: institutionId,
           patient_id: r.patientId || r.patient_id || r.id || `PAT-2026-${100 + idx}`,
           email: r.email || null,
           phone: r.phone || null,
