@@ -64,10 +64,10 @@ syncDefaultRosterToSupabase();
 // Default Admin Account
 const DEFAULT_ADMIN = {
   id: 'usr_adm_999',
-  name: 'Dr. Sarah Chen',
-  email: 's.chen@university.edu',
+  name: 'Dr. Sarah Chen, MD',
+  email: 'admin@campushealth.edu',
   role: 'ADMIN',
-  department: 'Financial Aid & Student Welfare',
+  department: 'Clinical Triage & Emergency Copay Desk',
   institutionId: DEFAULT_INSTITUTION_ID,
   avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150',
   token: 'jwt_mock_token_admin_sarah_chen',

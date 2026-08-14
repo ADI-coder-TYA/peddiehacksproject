@@ -14,7 +14,7 @@ class UserProfileScreen extends StatefulWidget {
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _oldPassCtrl = TextEditingController(text: 'Student@123');
+  final TextEditingController _oldPassCtrl = TextEditingController();
   final TextEditingController _newPassCtrl = TextEditingController();
   final TextEditingController _confirmPassCtrl = TextEditingController();
 
@@ -126,8 +126,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final isStudent = auth.isStudent;
     final isMobile = MediaQuery.of(context).size.width < 768;
 
-    final primaryColor = isStudent ? const Color(0xFFEE4D9F) : const Color(0xFF8B5CF6);
-    final accentColor = isStudent ? const Color(0xFF8B5CF6) : const Color(0xFF3B82F6);
+    final primaryColor = isStudent ? const Color(0xFF0D9488) : const Color(0xFF0D9488);
+    final accentColor = isStudent ? const Color(0xFF0284C7) : const Color(0xFF0284C7);
 
     final department = user?.department;
     final instId = user?.institutionId ?? ApiConfig.institutionId;
@@ -171,7 +171,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               radius: isMobile ? 30 : 36,
                               backgroundColor: Colors.white,
                               child: Icon(
-                                isStudent ? Icons.person : Icons.security,
+                                isStudent ? Icons.person : Icons.local_hospital,
                                 color: primaryColor,
                                 size: isMobile ? 32 : 38,
                               ),
@@ -186,7 +186,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        user?.name ?? (isStudent ? 'Student' : 'Administrator'),
+                                        user?.name ?? (isStudent ? 'Patient' : 'Dr. Sarah Chen, MD'),
                                         overflow: TextOverflow.ellipsis,
                                         style: GoogleFonts.outfit(
                                           fontSize: isMobile ? 18 : 22,
@@ -204,7 +204,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                         border: Border.all(color: primaryColor.withValues(alpha: 0.3)),
                                       ),
                                       child: Text(
-                                        isStudent ? 'STUDENT' : 'ADMINISTRATOR',
+                                        isStudent ? 'PATIENT' : 'CHIEF MEDICAL OFFICER',
                                         style: GoogleFonts.outfit(
                                           fontSize: 10,
                                           fontWeight: FontWeight.w800,
@@ -217,7 +217,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  user?.email ?? (isStudent ? 'student@university.edu' : 'admin@university.edu'),
+                                  user?.email ?? (isStudent ? 'patient@campushealth.edu' : 'admin@campushealth.edu'),
                                   style: GoogleFonts.outfit(
                                     fontSize: 13,
                                     color: const Color(0xFF64748B),
@@ -227,7 +227,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
-                                      const Icon(Icons.school_outlined, size: 14, color: Color(0xFF64748B)),
+                                      const Icon(Icons.medical_services_outlined, size: 14, color: Color(0xFF64748B)),
                                       const SizedBox(width: 4),
                                       Text(
                                         department,
@@ -252,7 +252,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _buildMiniInfoCol('Institution', instId, Icons.apartment),
-                          _buildMiniInfoCol('Role Access', isStudent ? 'Crisis & Grants' : 'Adjudication & RBAC', Icons.shield_outlined),
+                          _buildMiniInfoCol('Role Access', isStudent ? 'Clinical Support & Copays' : 'Adjudication & RBAC', Icons.shield_outlined),
                           _buildMiniInfoCol('Status', 'Active Session', Icons.check_circle_outline, color: const Color(0xFF10B981)),
                         ],
                       ),

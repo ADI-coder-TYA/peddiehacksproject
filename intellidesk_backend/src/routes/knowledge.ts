@@ -276,7 +276,7 @@ knowledgeRouter.get('/list', async (req: Request, res: Response) => {
       return;
     }
 
-    // Deduplicate — one entry per policy_name, compute chunk count
+    // Deduplicate & group — one entry per document base name, compute chunk count
     const docMap = new Map<string, {
       id: string;
       document_name: string;
@@ -286,17 +286,20 @@ knowledgeRouter.get('/list', async (req: Request, res: Response) => {
     }>();
 
     for (const row of data ?? []) {
-      const nameKey = row.policy_name || row.id;
-      if (!docMap.has(nameKey)) {
-        docMap.set(nameKey, {
+      const rawName = row.policy_name || 'Clinical Policy Document';
+      const baseName = rawName.replace(/\s*—\s*Part\s*\d+/i, '').trim();
+      const docKey = baseName || row.id;
+
+      if (!docMap.has(docKey)) {
+        docMap.set(docKey, {
           id: row.id,
-          document_name: row.policy_name || 'Clinical Policy Document',
-          file_name: `${row.policy_name || 'policy'}.pdf`,
+          document_name: baseName,
+          file_name: `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.pdf`,
           uploaded_at: row.created_at || new Date().toISOString(),
           chunk_count: 1,
         });
       } else {
-        docMap.get(nameKey)!.chunk_count++;
+        docMap.get(docKey)!.chunk_count++;
       }
     }
 
