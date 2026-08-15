@@ -148,6 +148,7 @@ export class PayoutService {
 }
 
 import { supabase } from '../config/supabase.js';
+import { logAuditEvent } from './auditLogger.js';
 
 export async function disburseClaimCopay(
   claimId: string,
@@ -156,7 +157,7 @@ export async function disburseClaimCopay(
   institutionId?: string
 ) {
   const { data: claim } = await supabase.from('claims').select('*').eq('id', claimId).single();
-  const instId = institutionId || claim?.institution_id || 'nano123';
+  const instId = institutionId || claim?.institution_id || 'inst-001';
 
   const receipt = await PayoutService.processPayout({
     claimId,
@@ -181,6 +182,21 @@ export async function disburseClaimCopay(
     payout_method: payoutMethod,
     payout_reference: receipt.transactionReference,
   }).eq('id', claimId);
+
+  await logAuditEvent(
+    instId,
+    claimId,
+    'COPAY_DISBURSED',
+    'CLINICAL_ADMIN',
+    {
+      amount,
+      payoutMethod,
+      payoutReference: receipt.transactionReference,
+      currency: claim?.currency || 'INR',
+      patientPhone: claim?.patient_phone,
+    },
+    'CLAIM'
+  );
 
   return receipt;
 }

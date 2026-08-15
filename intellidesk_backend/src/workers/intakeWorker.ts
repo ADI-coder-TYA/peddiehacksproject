@@ -19,6 +19,7 @@ import * as attritionModel from '../services/attritionModel.js';
 import { evaluateFraudRisk } from '../services/fraudSentinel.js';
 import { evaluateLifeSafety } from '../services/safetyGuardrails.js';
 import { analyzeClinicalText } from '../services/nlpPipeline.js';
+import { logAuditEvent } from '../services/auditLogger.js';
 import { EsiLevel, ClaimStatus } from '../types/clinical.js';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'dummy_key');
@@ -511,6 +512,25 @@ export const intakeWorker = new Worker(
 
       // 14. Telemetry Log
       console.log(`🩺 [Clinical Triage] Claim ${claimId} processed | ESI: ${esiLevel} | Copay Recommended: ${effectiveCurrency} ${finalCopay}`);
+
+      // Log to immutable audit ledger
+      await logAuditEvent(
+        instId,
+        claimId,
+        claimStatus === 'Approved' ? 'AUTO_APPROVAL_DISBURSED' : (isFlagged ? 'FRAUD_QUARANTINE_ALERT' : (isLifeSafetyAlert ? 'LIFE_SAFETY_CRISIS_OVERRIDE' : 'AI_TRIAGE_EVALUATED')),
+        'AI_AGENT',
+        {
+          esiLevel,
+          csiScore,
+          recommendedCopayAmount: finalCopay,
+          clinicalCategory: parsedCategory,
+          currency: effectiveCurrency,
+          status: claimStatus,
+          isFlagged,
+          isLifeSafetyAlert,
+        },
+        'CLAIM'
+      );
 
       // 15. Emit Socket.io events for real-time frontend UI update
       getIO().emit('claim:updated', savedClaim || { id: claimId, ...claimUpdatePayload });
