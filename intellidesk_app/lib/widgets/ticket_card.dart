@@ -42,7 +42,6 @@ class _TicketCardState extends State<TicketCard> {
   Widget build(BuildContext context) {
     final ticket = widget.ticket;
     final bool hasAnomaly = _isAnomalyOrFraud(ticket.flagReason, ticket.status);
-    final bool isFlightRisk = ticket.dropoutRiskScore > 0.65;
     final Color severityColor = _getCrisisColor(ticket.crisisSeverityIndex);
 
     return MouseRegion(

@@ -80,7 +80,6 @@ class TicketDetailDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final severityColor = _getCrisisColor(ticket.crisisSeverityIndex);
     final String patientDisplay = ticket.studentPhone.isNotEmpty
         ? ticket.studentPhone
         : 'Registered Patient #${ticket.id.substring(0, ticket.id.length > 8 ? 8 : ticket.id.length)}';
