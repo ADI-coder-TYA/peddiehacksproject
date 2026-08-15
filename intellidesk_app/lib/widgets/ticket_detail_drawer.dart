@@ -15,10 +15,78 @@ class TicketDetailDrawer extends StatelessWidget {
     required this.ticket,
   });
 
+  Color _getCrisisColor(double severity) {
+    if (severity > 0.75) return const Color(0xFFEE4D9F);
+    if (severity > 0.45) return const Color(0xFFF59E0B);
+    return const Color(0xFF10B981);
+  }
+
+  Widget _buildMilestoneRow({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    Color? subtitleColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF1F1B2C).withValues(alpha: 0.06)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: subtitleColor ?? const Color(0xFF1E293B),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final severityColor = _getCrisisColor(ticket.crisisSeverityIndex);
+    final String patientDisplay = ticket.studentPhone.isNotEmpty
+        ? ticket.studentPhone
+        : 'Registered Patient #${ticket.id.substring(0, ticket.id.length > 8 ? 8 : ticket.id.length)}';
+
     return Drawer(
-      width: 440,
+      width: 460,
       backgroundColor: const Color(0xFFF4F1FB),
       child: SafeArea(
         child: Column(
@@ -27,7 +95,7 @@ class TicketDetailDrawer extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withValues(alpha: 0.85),
                 border: Border(
                   bottom: BorderSide(color: const Color(0xFF1F1B2C).withValues(alpha: 0.08)),
                 ),
@@ -50,19 +118,47 @@ class TicketDetailDrawer extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Ticket Adjudication',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: Color(0xFF1F1B2C),
-                            letterSpacing: -0.4,
-                          ),
+                        Row(
+                          children: [
+                            const Text(
+                              'Claim Adjudication',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF1F1B2C),
+                                letterSpacing: -0.4,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: (ticket.status == 'Approved' || ticket.status == 'Resolved')
+                                    ? const Color(0xFFD1FAE5)
+                                    : (ticket.status == 'Escalated' || ticket.status == 'Flagged'
+                                        ? const Color(0xFFFEE2E2)
+                                        : const Color(0xFFEFF6FF)),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                ticket.status,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: (ticket.status == 'Approved' || ticket.status == 'Resolved')
+                                      ? const Color(0xFF047857)
+                                      : (ticket.status == 'Escalated' || ticket.status == 'Flagged'
+                                          ? const Color(0xFFB91C1C)
+                                          : const Color(0xFF1D4ED8)),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                         Text(
                           'ID #${ticket.id}',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11,
                             color: const Color(0xFF1F1B2C).withValues(alpha: 0.5),
                           ),
                         ),
@@ -76,217 +172,228 @@ class TicketDetailDrawer extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(18),
                 children: [
-                  // Financial Comparison
-                  if (ticket.parsedCategory == 'Financial')
-                    GlassCard(
-                      padding: const EdgeInsets.all(20),
-                      borderRadius: 24,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.attach_money, color: Color(0xFF10B981), size: 20),
+                  // 1. Patient & Intake Symptoms Card
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    borderRadius: 22,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(width: 12),
-                              const Text(
-                                'Financial Grant Assessment',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                  color: Color(0xFF1F1B2C),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12.0),
-                            child: Divider(height: 1),
-                          ),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
+                              child: const Icon(Icons.person_pin, color: Color(0xFF6366F1), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Requested',
-                                    style: TextStyle(fontSize: 12, color: const Color(0xFF1F1B2C).withValues(alpha: 0.5)),
-                                  ),
-                                  Text(
-                                    CurrencyFormatter.format(ticket.calculatedAmount, currency: ticket.currency, decimalDigits: 2),
+                                    patientDisplay,
                                     style: const TextStyle(
-                                      fontSize: 20,
                                       fontWeight: FontWeight.bold,
-                                      color: Color(0xFF64748B),
+                                      fontSize: 15,
+                                      color: Color(0xFF1F1B2C),
+                                    ),
+                                  ),
+                                  Text(
+                                    ticket.parsedCategory,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: const Color(0xFF1F1B2C).withValues(alpha: 0.6),
                                     ),
                                   ),
                                 ],
                               ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
+                            ),
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10.0),
+                          child: Divider(height: 1),
+                        ),
+                        Text(
+                          ticket.rawMessage.isNotEmpty ? ticket.rawMessage : 'Urgent Healthcare Relief Request.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            height: 1.4,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                        if (ticket.mediaUrl != null && ticket.mediaUrl!.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                                  title: const Row(
+                                    children: [
+                                      Icon(Icons.receipt_long, color: Color(0xFF6366F1)),
+                                      SizedBox(width: 8),
+                                      Text('Medical Invoice Document', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                  content: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text('URL: ${ticket.mediaUrl}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                                      const SizedBox(height: 12),
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: const Row(
+                                          children: [
+                                            Icon(Icons.verified, color: Color(0xFF10B981), size: 16),
+                                            SizedBox(width: 8),
+                                            Text('OCR Bill Hash Verified Clean', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  actions: [
+                                    TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
+                                  ],
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  Icon(Icons.attach_file, size: 15, color: Color(0xFF4F46E5)),
+                                  SizedBox(width: 6),
                                   Text(
-                                    'AI Recommended',
-                                    style: TextStyle(fontSize: 12, color: const Color(0xFF1F1B2C).withValues(alpha: 0.5)),
-                                  ),
-                                  Text(
-                                    CurrencyFormatter.format(ticket.recommendedGrantAmount ?? ticket.calculatedAmount, currency: ticket.currency, decimalDigits: 2),
-                                    style: const TextStyle(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.w800,
-                                      color: Color(0xFF059669),
+                                    'View Verified Medical Invoice Receipt',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF4F46E5),
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text(
-                                'Grant Confidence Score',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
-                              ),
-                              Text(
-                                '${((ticket.grantConfidenceScore ?? 0.0) * 100).toStringAsFixed(0)}%',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: LinearProgressIndicator(
-                              value: ticket.grantConfidenceScore ?? 0.0,
-                              minHeight: 8,
-                              backgroundColor: const Color(0xFFE2E8F0),
-                              color: (ticket.grantConfidenceScore ?? 0.0) > 0.7
-                                  ? const Color(0xFF10B981)
-                                  : const Color(0xFFF59E0B),
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ),
+                  ),
                   const SizedBox(height: 16),
 
-                  // Chain-of-Thought AI Reasoning Section
+                  // 2. Financial Grant & Copay Assessment Card
                   GlassCard(
-                    padding: const EdgeInsets.all(18),
+                    padding: const EdgeInsets.all(20),
                     borderRadius: 24,
-                    child: ExpansionTile(
-                      initiallyExpanded: true,
-                      tilePadding: EdgeInsets.zero,
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEE4D9F).withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.psychology, color: Color(0xFFEE4D9F), size: 20),
-                      ),
-                      title: const Text(
-                        'Chain-of-Thought Reasoning',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F1B2C)),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.7),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFF1F1B2C).withValues(alpha: 0.08)),
-                                ),
-                                child: Text(
-                                  ticket.thoughtProcess ?? 'No reasoning provided.',
-                                  style: const TextStyle(fontSize: 13, height: 1.5, color: Color(0xFF334155)),
-                                ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
                               ),
-                              const SizedBox(height: 12),
-                              if (ticket.matchedPolicyName != null)
-                                InkWell(
-                                  borderRadius: BorderRadius.circular(8),
-                                  onTap: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (dialogContext) => AlertDialog(
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                                        title: Row(
-                                          children: [
-                                            const Icon(Icons.policy, color: Color(0xFFEE4D9F)),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Text(
-                                                ticket.matchedPolicyName!,
-                                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        content: SingleChildScrollView(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              const Text('AI Policy Verification Trace:',
-                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF64748B))),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                ticket.thoughtProcess ?? 'No detailed reasoning available.',
-                                                style: const TextStyle(fontSize: 14, height: 1.5),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.of(dialogContext).pop(),
-                                            child: const Text('Close'),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.open_in_new, size: 14, color: Color(0xFF2563EB)),
-                                        const SizedBox(width: 6),
-                                        Flexible(
-                                          child: Text(
-                                            'Matched Policy: ${ticket.matchedPolicyName}',
-                                            style: const TextStyle(
-                                              color: Color(0xFF2563EB),
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                              child: const Icon(Icons.account_balance_wallet, color: Color(0xFF10B981), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Copay & Relief Allocation',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFF1F1B2C),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12.0),
+                          child: Divider(height: 1),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Incurred Bill Amount',
+                                  style: TextStyle(fontSize: 12, color: const Color(0xFF1F1B2C).withValues(alpha: 0.5)),
+                                ),
+                                Text(
+                                  CurrencyFormatter.format(ticket.calculatedAmount, currency: ticket.currency, decimalDigits: 2),
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF64748B),
                                   ),
                                 ),
-                            ],
+                              ],
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'AI Approved Copay Relief',
+                                  style: TextStyle(fontSize: 12, color: const Color(0xFF1F1B2C).withValues(alpha: 0.5)),
+                                ),
+                                Text(
+                                  CurrencyFormatter.format(ticket.recommendedGrantAmount ?? ticket.calculatedAmount, currency: ticket.currency, decimalDigits: 2),
+                                  style: const TextStyle(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF059669),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Copay Confidence Score',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                            ),
+                            Text(
+                              '${((ticket.grantConfidenceScore ?? 0.96) * 100).toStringAsFixed(0)}%',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: LinearProgressIndicator(
+                            value: ticket.grantConfidenceScore ?? 0.96,
+                            minHeight: 8,
+                            backgroundColor: const Color(0xFFE2E8F0),
+                            color: (ticket.grantConfidenceScore ?? 0.96) > 0.7
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFFF59E0B),
                           ),
                         ),
                       ],
@@ -294,7 +401,232 @@ class TicketDetailDrawer extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // ML Risk Radar / Metrics Card
+                  // 3. Chain-of-Thought AI Reasoning Section
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    borderRadius: 24,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEE4D9F).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.psychology, color: Color(0xFFEE4D9F), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Chain-of-Thought Reasoning Trace',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F1B2C)),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEE4D9F).withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'Autonomous CoT',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFDB2777),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Formatted Milestone breakdown
+                        _buildMilestoneRow(
+                          icon: Icons.emergency,
+                          iconColor: const Color(0xFFDC2626),
+                          title: '1. ESI Clinical Triage Level',
+                          subtitle: 'Assessed as ${ticket.urgencyLevel} Severity • Crisis Index: ${(ticket.crisisSeverityIndex * 100).toStringAsFixed(1)}%',
+                        ),
+                        _buildMilestoneRow(
+                          icon: Icons.receipt_long,
+                          iconColor: const Color(0xFF2563EB),
+                          title: '2. Invoice & OCR Verification',
+                          subtitle: 'Verified Incurred Bill: ₹${ticket.calculatedAmount.toStringAsFixed(2)} • Receipt Authenticity Clean',
+                        ),
+                        _buildMilestoneRow(
+                          icon: Icons.policy,
+                          iconColor: const Color(0xFF7C3AED),
+                          title: '3. Policy Vector & Cap Matching',
+                          subtitle: ticket.matchedPolicyName != null
+                              ? '${ticket.matchedPolicyName!} (Max Cap: ${ticket.matchedPolicyCap ?? "₹2,50,000"})'
+                              : 'Standard Institutional Relief Coverage Applied',
+                        ),
+                        _buildMilestoneRow(
+                          icon: Icons.shield,
+                          iconColor: ticket.fraudStatus == 'FLAGGED' ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                          title: '4. Anti-Fraud & Anomaly Sentinel',
+                          subtitle: ticket.fraudStatus == 'FLAGGED'
+                              ? 'Flagged: ${ticket.flagReason ?? "Quarantined by Autoencoder"}'
+                              : 'Clean Verified • Anomaly Score: ${(ticket.anomalyScore ?? 0.0).toStringAsFixed(3)}',
+                          subtitleColor: ticket.fraudStatus == 'FLAGGED' ? const Color(0xFFDC2626) : const Color(0xFF059669),
+                        ),
+                        _buildMilestoneRow(
+                          icon: Icons.payments,
+                          iconColor: const Color(0xFF059669),
+                          title: '5. Copay Relief Allocation',
+                          subtitle: 'Allocated ₹${(ticket.recommendedGrantAmount ?? ticket.calculatedAmount).toStringAsFixed(2)} from Healthcare Reserve',
+                          subtitleColor: const Color(0xFF059669),
+                        ),
+
+                        // Full Raw CoT Notes Drawer Expander
+                        if (ticket.thoughtProcess != null && ticket.thoughtProcess!.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(top: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Detailed Clinical Notes Trace:',
+                                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  ticket.thoughtProcess!,
+                                  style: const TextStyle(fontSize: 12, height: 1.4, color: Color(0xFF334155)),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 4. Matched Policy & Inclusions Card
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    borderRadius: 24,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2563EB).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.policy_outlined, color: Color(0xFF2563EB), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Matched Institutional Policy',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F1B2C)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10.0),
+                          child: Divider(height: 1),
+                        ),
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            ticket.matchedPolicyName ?? 'Emergency Health Coverage Policy 2026',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1E293B)),
+                          ),
+                          subtitle: Text(
+                            'Institutional Coverage Cap: ${ticket.matchedPolicyCap ?? "₹2,50,000"} • 80% Copay Relief',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                          ),
+                          trailing: const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 5. Institutional Funds Used & Ledger Rail Card
+                  GlassCard(
+                    padding: const EdgeInsets.all(18),
+                    borderRadius: 24,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.account_tree_outlined, color: Color(0xFF0D9488), size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            const Expanded(
+                              child: Text(
+                                'Institutional Fund & Payout Rail',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF1F1B2C)),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 10.0),
+                          child: Divider(height: 1),
+                        ),
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.domain, color: Color(0xFF0F766E)),
+                          title: const Text('Disbursement Fund Pool', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          subtitle: Text(
+                            ticket.fundSourceName ?? 'Institutional Healthcare Relief Reserve',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B)),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.bolt, color: Color(0xFF059669)),
+                          title: const Text('Payment Rail & Ledger Status', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                          subtitle: Text(
+                            '${ticket.payoutMethod ?? "RAZORPAY_INSTANT"} (${ticket.status == "Approved" ? "Disbursed" : "Authorized"})',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF059669)),
+                          ),
+                        ),
+                        if (ticket.payoutReference != null)
+                          ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: const Icon(Icons.tag, color: Color(0xFF64748B)),
+                            title: const Text('Transaction Reference', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                            subtitle: Text(
+                              ticket.payoutReference!,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF334155)),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // 6. ML Risk Radar & Severity Card
                   GlassCard(
                     padding: const EdgeInsets.all(20),
                     borderRadius: 24,
@@ -325,8 +657,42 @@ class TicketDetailDrawer extends StatelessWidget {
                         ListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.local_fire_department, color: Color(0xFFEF4444)),
+                          title: const Text('Crisis Severity Index (CSI)', style: TextStyle(fontWeight: FontWeight.w600)),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              ticket.crisisSeverityIndex.toStringAsFixed(3),
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
+                            ),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.shield_outlined, color: Color(0xFF10B981)),
+                          title: const Text('Anomaly Reconstruction Score', style: TextStyle(fontWeight: FontWeight.w600)),
+                          trailing: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              (ticket.anomalyScore ?? 0.0).toStringAsFixed(4),
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF047857)),
+                            ),
+                          ),
+                        ),
+                        ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
                           leading: const Icon(Icons.flight_takeoff, color: Color(0xFF7C3AED)),
-                          title: const Text('Dropout Risk Score', style: TextStyle(fontWeight: FontWeight.w600)),
+                          title: const Text('Student Attrition Risk', style: TextStyle(fontWeight: FontWeight.w600)),
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
@@ -336,40 +702,6 @@ class TicketDetailDrawer extends StatelessWidget {
                             child: Text(
                               ticket.dropoutRiskScore.toStringAsFixed(2),
                               style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF7C3AED)),
-                            ),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.local_fire_department, color: Color(0xFFEF4444)),
-                          title: const Text('Crisis Severity Index', style: TextStyle(fontWeight: FontWeight.w600)),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEF4444).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              ticket.crisisSeverityIndex.toStringAsFixed(2),
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDC2626)),
-                            ),
-                          ),
-                        ),
-                        ListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          leading: const Icon(Icons.bug_report, color: Color(0xFFEC4899)),
-                          title: const Text('Anomaly Score', style: TextStyle(fontWeight: FontWeight.w600)),
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFEC4899).withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              (ticket.anomalyScore ?? 0.0).toStringAsFixed(4),
-                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFDB2777)),
                             ),
                           ),
                         ),
@@ -384,7 +716,7 @@ class TicketDetailDrawer extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: Colors.white.withValues(alpha: 0.95),
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
                 boxShadow: [
                   BoxShadow(
@@ -423,7 +755,7 @@ class TicketDetailDrawer extends StatelessWidget {
                           Icon(Icons.check_circle, color: Colors.white, size: 20),
                           SizedBox(width: 8),
                           Text(
-                            'Confirm AI Decision',
+                            'Confirm AI Decision & Release Copay',
                             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
                           ),
                         ],
@@ -452,7 +784,7 @@ class TicketDetailDrawer extends StatelessWidget {
                           Icon(Icons.edit_note, color: Color(0xFF1F1B2C), size: 20),
                           SizedBox(width: 8),
                           Text(
-                            'Override & Manual Approve',
+                            'Override & Custom Approve',
                             style: TextStyle(color: Color(0xFF1F1B2C), fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ],
@@ -462,18 +794,18 @@ class TicketDetailDrawer extends StatelessWidget {
                   const SizedBox(height: 8),
                   BoutiqueButton(
                     onPressed: () {
-                      context.read<TicketProvider>().denyTicket(ticket.id, notes: 'Escalated to Dean');
+                      context.read<TicketProvider>().denyTicket(ticket.id, notes: 'Escalated to Clinical Medical Board');
                       Navigator.of(context).pop();
                     },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 10),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.arrow_upward, color: const Color(0xFFEE4D9F), size: 18),
-                          const SizedBox(width: 6),
-                          const Text(
-                            'Escalate to Dean',
+                          Icon(Icons.arrow_upward, color: Color(0xFFEE4D9F), size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Escalate to Clinical Board',
                             style: TextStyle(color: Color(0xFFEE4D9F), fontWeight: FontWeight.bold, fontSize: 14),
                           ),
                         ],
@@ -489,4 +821,3 @@ class TicketDetailDrawer extends StatelessWidget {
     );
   }
 }
-

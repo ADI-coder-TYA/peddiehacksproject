@@ -146,7 +146,7 @@ class _TicketCardState extends State<TicketCard> {
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
-                                          ticket.studentPhone,
+                                          ticket.studentPhone.isNotEmpty ? ticket.studentPhone : 'Patient #${ticket.id.substring(0, ticket.id.length > 8 ? 8 : ticket.id.length)}',
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             color: Color(0xFF1F1B2C),
@@ -155,9 +155,9 @@ class _TicketCardState extends State<TicketCard> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                         Text(
-                                          'ID #${ticket.id.substring(0, ticket.id.length > 8 ? 8 : ticket.id.length)}',
+                                          'ID #${ticket.id.substring(0, ticket.id.length > 8 ? 8 : ticket.id.length)} • ${ticket.urgencyLevel}',
                                           style: TextStyle(
-                                            color: const Color(0xFF1F1B2C).withValues(alpha: 0.45),
+                                            color: const Color(0xFF1F1B2C).withValues(alpha: 0.5),
                                             fontSize: 11,
                                             fontWeight: FontWeight.w500,
                                           ),
@@ -171,28 +171,28 @@ class _TicketCardState extends State<TicketCard> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                               decoration: BoxDecoration(
-                                color: ticket.status == 'Approved'
+                                color: (ticket.status == 'Approved' || ticket.status == 'Resolved')
                                     ? const Color(0xFFD1FAE5)
-                                    : (ticket.status == 'Escalated'
+                                    : (ticket.status == 'Escalated' || ticket.status == 'Flagged'
                                         ? const Color(0xFFFEE2E2)
-                                        : const Color(0xFFF1F5F9)),
+                                        : const Color(0xFFEFF6FF)),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: ticket.status == 'Approved'
+                                  color: (ticket.status == 'Approved' || ticket.status == 'Resolved')
                                       ? const Color(0xFF6EE7B7)
-                                      : (ticket.status == 'Escalated'
+                                      : (ticket.status == 'Escalated' || ticket.status == 'Flagged'
                                           ? const Color(0xFFFCA5A5)
-                                          : const Color(0xFFCBD5E1)),
+                                          : const Color(0xFFBFDBFE)),
                                 ),
                               ),
                               child: Text(
                                 ticket.status,
                                 style: TextStyle(
-                                  color: ticket.status == 'Approved'
+                                  color: (ticket.status == 'Approved' || ticket.status == 'Resolved')
                                       ? const Color(0xFF047857)
-                                      : (ticket.status == 'Escalated'
+                                      : (ticket.status == 'Escalated' || ticket.status == 'Flagged'
                                           ? const Color(0xFFB91C1C)
-                                          : const Color(0xFF475569)),
+                                          : const Color(0xFF1D4ED8)),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 11,
                                 ),
@@ -201,8 +201,38 @@ class _TicketCardState extends State<TicketCard> {
                           ],
                         ),
                         const SizedBox(height: 10),
+                        
+                        // Category Pill
+                        if (ticket.parsedCategory.isNotEmpty)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF1F1B2C).withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.local_hospital_outlined, size: 12, color: Color(0xFF64748B)),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    ticket.parsedCategory,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF475569),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         Text(
-                          ticket.rawMessage,
+                          ticket.rawMessage.isNotEmpty ? ticket.rawMessage : 'No additional symptoms reported.',
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -211,6 +241,46 @@ class _TicketCardState extends State<TicketCard> {
                             height: 1.3,
                           ),
                         ),
+                        
+                        // Financial Copay Breakdown in Card
+                        if (ticket.calculatedAmount > 0 || (ticket.recommendedGrantAmount ?? 0) > 0)
+                          Container(
+                            margin: const EdgeInsets.only(top: 10),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Bill: ₹${ticket.calculatedAmount.toStringAsFixed(0)}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1F1B2C).withValues(alpha: 0.65),
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.verified, size: 12, color: Color(0xFF059669)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Copay: ₹${(ticket.recommendedGrantAmount ?? ticket.calculatedAmount).toStringAsFixed(0)}',
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF059669),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
@@ -248,40 +318,42 @@ class _TicketCardState extends State<TicketCard> {
                                     (ticket.crisisSeverityIndex * 100).toStringAsFixed(0),
                                     style: TextStyle(
                                       color: severityColor,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                       fontWeight: FontWeight.w800,
                                     ),
                                   ),
                                 ],
                               ),
                             ),
-                            // Attrition Risk Badge
-                            if (isFlightRisk)
+                            // Matched Policy Badge
+                            if (ticket.matchedPolicyName != null)
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                  color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
+                                  border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.25)),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.flight_takeoff, size: 13, color: Color(0xFF7C3AED)),
-                                    SizedBox(width: 4),
+                                    const Icon(Icons.policy_outlined, size: 12, color: Color(0xFF2563EB)),
+                                    const SizedBox(width: 4),
                                     Text(
-                                      'Flight Risk',
-                                      style: TextStyle(
-                                        color: Color(0xFF7C3AED),
+                                      ticket.matchedPolicyName!.length > 18
+                                          ? '${ticket.matchedPolicyName!.substring(0, 18)}...'
+                                          : ticket.matchedPolicyName!,
+                                      style: const TextStyle(
+                                        color: Color(0xFF2563EB),
                                         fontSize: 11,
-                                        fontWeight: FontWeight.bold,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                             // Disbursement Rail Badge
-                            if (ticket.status == 'Approved')
+                            if (ticket.status == 'Approved' || ticket.status == 'Resolved')
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                 decoration: BoxDecoration(
