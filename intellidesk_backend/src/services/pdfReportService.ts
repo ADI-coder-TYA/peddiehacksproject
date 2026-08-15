@@ -164,6 +164,7 @@ export async function fetchClinicalAuditMetrics(
 /**
  * Generate MedAccess AI Institutional Clinical Triage & Copay Audit Report PDF
  */
+export const generateAuditPdfReport = generateExecutiveReport;
 export async function generateExecutiveReport(
   timeframe: string = '30d',
   institutionId: string = 'default'

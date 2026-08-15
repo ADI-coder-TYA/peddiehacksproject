@@ -10,7 +10,8 @@
     "train:ml": "tsx scripts/generate_training_data.ts && tsx src/ml/train_all.ts",
     "seed:policies": "tsx scripts/seed_policies.ts",
     "seed:funds": "tsx scripts/seed_funds.ts",
-    "seed:all": "tsx scripts/seed_policies.ts && tsx scripts/seed_funds.ts"
+    "seed:all": "tsx scripts/seed_policies.ts && tsx scripts/seed_funds.ts",
+    "test:workflows": "tsx scripts/testMedAccessSuite.ts"
   },
   "keywords": [],
   "author": "",

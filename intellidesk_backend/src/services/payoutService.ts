@@ -146,3 +146,42 @@ export class PayoutService {
     };
   }
 }
+
+import { supabase } from '../config/supabase.js';
+
+export async function disburseClaimCopay(
+  claimId: string,
+  amount: number,
+  payoutMethod: string = 'RAZORPAY_UPI',
+  institutionId?: string
+) {
+  const { data: claim } = await supabase.from('claims').select('*').eq('id', claimId).single();
+  const instId = institutionId || claim?.institution_id || 'nano123';
+
+  const receipt = await PayoutService.processPayout({
+    claimId,
+    institutionId: instId,
+    amount,
+    currency: claim?.currency || 'INR',
+    payoutMethod,
+    patientPhone: claim?.patient_phone,
+    vpa: `${claim?.patient_phone || 'patient'}@upi`,
+  });
+
+  const { data: funds } = await supabase.from('health_funds').select('*').eq('institution_id', instId);
+  const matchedFund = funds && funds.length > 0 ? funds[0] : null;
+  if (matchedFund) {
+    const newDisbursed = Number(matchedFund.total_disbursed || 0) + amount;
+    await supabase.from('health_funds').update({ total_disbursed: newDisbursed }).eq('id', matchedFund.id);
+  }
+
+  await supabase.from('claims').update({
+    status: 'Disbursed',
+    approved_amount: amount,
+    payout_method: payoutMethod,
+    payout_reference: receipt.transactionReference,
+  }).eq('id', claimId);
+
+  return receipt;
+}
+

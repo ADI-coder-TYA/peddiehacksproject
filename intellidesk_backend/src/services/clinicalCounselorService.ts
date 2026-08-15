@@ -189,18 +189,22 @@ export async function generateClinicalCounselorResponse(
         .eq('id', claimId);
 
       // Emit emergency alert to Admin War Room
-      const io = getIO();
-      io.emit('emergency:alert', {
-        claimId,
-        esiLevel: 'ESI_1_CRITICAL',
-        isLifeSafetyAlert: true,
-        patientMessage,
-        timestamp: new Date().toISOString(),
-      });
-      io.to(`claim:${claimId}`).emit('emergency:alert', {
-        claimId,
-        isLifeSafetyAlert: true,
-      });
+      try {
+        const io = getIO();
+        io.emit('emergency:alert', {
+          claimId,
+          esiLevel: 'ESI_1_CRITICAL',
+          isLifeSafetyAlert: true,
+          patientMessage,
+          timestamp: new Date().toISOString(),
+        });
+        io.to(`claim:${claimId}`).emit('emergency:alert', {
+          claimId,
+          esiLevel: 'ESI_1_CRITICAL',
+          isLifeSafetyAlert: true,
+          resources: suggestedResources,
+        });
+      } catch (_) {}
     } catch (dbErr) {
       console.warn(`[ClinicalCounselor] Escalation write warning:`, dbErr);
     }

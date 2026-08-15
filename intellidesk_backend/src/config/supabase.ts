@@ -22,3 +22,5 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServic
   },
 });
 
+export const supabaseAdmin = supabase;
+
