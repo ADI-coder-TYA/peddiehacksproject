@@ -55,9 +55,10 @@ class AuthProvider extends ChangeNotifier {
     ApiConfig.userPhone = _user?.phone;
     ApiConfig.userId = _user?.id;
     ApiConfig.userDepartment = _user?.department;
-    if (_user?.institutionId != null && _user!.institutionId!.isNotEmpty) {
-      ApiConfig.institutionId = _user!.institutionId!;
-      ApiConfig.currentInstitutionId = _user!.institutionId!;
+    final instId = _user?.institutionId;
+    if (instId != null && instId.isNotEmpty) {
+      ApiConfig.institutionId = instId;
+      ApiConfig.currentInstitutionId = instId;
     } else {
       ApiConfig.institutionId = 'inst-001';
       ApiConfig.currentInstitutionId = 'inst-001';
