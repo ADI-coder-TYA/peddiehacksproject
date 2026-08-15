@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:url_launcher/url_launcher.dart';
@@ -72,6 +73,18 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
         }
       });
 
+      _socket?.on('health_funds:updated', (_) {
+        if (mounted) _fetchClaims();
+      });
+
+      _socket?.on('health_funds:allocated', (_) {
+        if (mounted) _fetchClaims();
+      });
+
+      _socket?.on('budget:disbursed', (_) {
+        if (mounted) _fetchClaims();
+      });
+
       _socket?.on('emergency:alert', (data) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -89,24 +102,54 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
 
   Future<void> _fetchClaims() async {
     try {
-      final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/claims'),
-        headers: ApiConfig.adminHeaders,
-      );
+      final futures = await Future.wait([
+        http.get(
+          Uri.parse('${ApiConfig.baseUrl}/claims'),
+          headers: ApiConfig.adminHeaders,
+        ),
+        http.get(
+          Uri.parse('${ApiConfig.baseUrl}/admin/telemetry/funds'),
+          headers: ApiConfig.adminHeaders,
+        ),
+      ]);
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        if (mounted) {
-          setState(() {
-            _claims = List<Map<String, dynamic>>.from(data);
-            _isLoading = false;
-            _criticalCount = _claims.where((c) => c['esi_level'] == 'ESI_1_CRITICAL' || c['is_life_safety_alert'] == true).length;
-            _totalDisbursed = _claims
-                .where((c) => c['status'] == 'Disbursed' || c['status'] == 'Approved')
-                .fold<double>(0.0, (sum, c) => sum + (c['approved_amount'] ?? c['recommended_copay_amount'] ?? 0.0).toDouble());
-            _remainingFund = (150000.0 - _totalDisbursed).clamp(0.0, 150000.0);
-          });
+      final claimsRes = futures[0];
+      final fundsRes = futures[1];
+
+      List<Map<String, dynamic>> claimsList = [];
+      if (claimsRes.statusCode == 200) {
+        final List data = jsonDecode(claimsRes.body);
+        claimsList = List<Map<String, dynamic>>.from(data);
+      }
+
+      double totalAllocated = 0.0;
+      double totalDisbursed = 0.0;
+
+      if (fundsRes.statusCode == 200) {
+        final fundsJson = jsonDecode(fundsRes.body);
+        final List fundsList = fundsJson is List ? fundsJson : (fundsJson['data'] ?? []);
+        for (final f in fundsList) {
+          totalAllocated += (num.tryParse(f['total_allocated']?.toString() ?? '0') ?? 0).toDouble();
+          totalDisbursed += (num.tryParse(f['total_disbursed']?.toString() ?? '0') ?? 0).toDouble();
         }
+      }
+
+      // Fallback if funds table has no rows
+      if (totalAllocated == 0.0) {
+        totalAllocated = 200000.0;
+        totalDisbursed = claimsList
+            .where((c) => c['status'] == 'Disbursed' || c['status'] == 'Approved')
+            .fold<double>(0.0, (sum, c) => sum + (c['approved_amount'] ?? c['recommended_copay_amount'] ?? 0.0).toDouble());
+      }
+
+      if (mounted) {
+        setState(() {
+          _claims = claimsList;
+          _isLoading = false;
+          _criticalCount = _claims.where((c) => c['esi_level'] == 'ESI_1_CRITICAL' || c['is_life_safety_alert'] == true).length;
+          _totalDisbursed = totalDisbursed;
+          _remainingFund = (totalAllocated - totalDisbursed).clamp(0.0, double.infinity);
+        });
         return;
       }
     } catch (err) {
@@ -349,10 +392,10 @@ class _AdminWarRoomScreenState extends State<AdminWarRoomScreen> with SingleTick
                   color: Colors.white,
                   child: Row(
                     children: [
-                      _buildKpiCard('Copay Disbursed', '₹${_totalDisbursed.toStringAsFixed(0)}', AppTheme.primaryBrand),
+                      _buildKpiCard('Copay Disbursed', NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(_totalDisbursed), AppTheme.primaryBrand),
                       _buildKpiCard('Critical ESI 1/2', '$_criticalCount Cases', AppTheme.emergencyRed),
                       _buildKpiCard('OCR Accuracy', '98.4%', AppTheme.accentCyan),
-                      _buildKpiCard('Remaining Pool', '₹${_remainingFund.toStringAsFixed(0)}', AppTheme.primaryDark),
+                      _buildKpiCard('Remaining Pool', NumberFormat.currency(symbol: '₹', decimalDigits: 0).format(_remainingFund), AppTheme.primaryDark),
                     ],
                   ),
                 ),
