@@ -199,28 +199,45 @@ export const intakeWorker = new Worker(
 
       const isFlagged = fraudReport.isFlagged;
 
-      // 11. Calculate Copay Recommendation
+      // 10.5. Resolve Per-Incident Policy Cap from Knowledge Base
+      let policyLimit = effectiveCurrency === 'INR' ? 100000 : 2500;
+      let policyCapSource = 'Standard Institutional Baseline';
+      try {
+        const { data: matchedPolicyRows } = await supabase
+          .from('policy_embeddings')
+          .select('policy_name, max_coverage_limit, category')
+          .eq('institution_id', institutionId)
+          .or(`category.ilike.%${parsedCategory}%,policy_name.ilike.%${parsedCategory}%`)
+          .order('max_coverage_limit', { ascending: false })
+          .limit(1);
+
+        if (matchedPolicyRows && matchedPolicyRows.length > 0) {
+          const matchedLimit = Number(matchedPolicyRows[0].max_coverage_limit);
+          if (matchedLimit > 0) {
+            policyLimit = matchedLimit;
+            policyCapSource = `${matchedPolicyRows[0].policy_name} (₹${policyLimit})`;
+          }
+        }
+      } catch (_) {}
+
+      // 11. Calculate Copay Recommendation with Per-Incident Cap
       let finalCopay = 0.00;
       if (isFlagged) {
         finalCopay = 0.00;
       } else {
         const baseBill = effectiveReceiptAmount || requestedAmount || (effectiveCurrency === 'INR' ? 5000 : 250);
         if (esiLevel === 'ESI_1_CRITICAL') {
-          // 100% coverage up to institutional ceiling
-          const maxCeiling = effectiveCurrency === 'INR' ? 80000 : 2500;
-          finalCopay = Math.min(baseBill, maxCeiling);
+          // 100% coverage up to policy incident ceiling
+          finalCopay = Math.min(baseBill, policyLimit);
         } else if (esiLevel === 'ESI_2_EMERGENT') {
-          // 80% coverage
-          const maxCeiling = effectiveCurrency === 'INR' ? 40000 : 1500;
-          finalCopay = Math.min(Math.round(baseBill * 0.8), maxCeiling);
+          // 80% coverage up to policy incident ceiling
+          finalCopay = Math.min(Math.round(baseBill * 0.8), Math.round(policyLimit * 0.85));
         } else if (esiLevel === 'ESI_3_URGENT') {
-          // 50% coverage
-          const maxCeiling = effectiveCurrency === 'INR' ? 20000 : 800;
-          finalCopay = Math.min(Math.round(baseBill * 0.5), maxCeiling);
+          // 50% coverage up to policy incident ceiling
+          finalCopay = Math.min(Math.round(baseBill * 0.5), Math.round(policyLimit * 0.5));
         } else {
           // Routine copay relief
-          const maxCeiling = effectiveCurrency === 'INR' ? 5000 : 200;
-          finalCopay = Math.min(Math.round(baseBill * 0.3), maxCeiling);
+          finalCopay = Math.min(Math.round(baseBill * 0.3), Math.round(policyLimit * 0.3));
         }
       }
 
@@ -232,6 +249,7 @@ export const intakeWorker = new Worker(
       const clinicalNotes = [
         `• 🩺 ESI Triage: Evaluated as ${esiLevel} (Score: ${csiScore.toFixed(3)})`,
         `• 🧾 Invoice: Verified ${effectiveCurrency} ${invoiceLabel}`,
+        `• 📋 Policy Cap: ${policyCapSource} [Max Cap: ${currencySymbol}${policyLimit}]`,
         `• 🛡️ Fraud Sentinel: ${isFlagged ? `FLAGGED (${fraudReport.flagReasons.join(', ')})` : `Clean (Risk: ${riskScore})`}`,
         `• 💳 Copay Allocation: Recommended ${currencySymbol}${finalCopay.toFixed(2)} based on ${esiLevel} clinical tier.`,
         isLifeSafetyAlert ? `• 🚨 LIFE SAFETY OVERRIDE: ${lifeSafety.crisisHotlineText}` : null,
