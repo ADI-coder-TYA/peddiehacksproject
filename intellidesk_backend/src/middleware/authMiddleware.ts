@@ -45,12 +45,19 @@ export const requireAuth = (req: AuthenticatedRequest, res: Response, next: Next
     }
 
     let institutionId = instHeader;
-    if (!institutionId && token.includes('jwt_token_admin_')) {
+    if (token.includes('jwt_token_admin_')) {
       const parts = token.replace('jwt_token_admin_', '').split('_');
-      institutionId = parts[0];
+      if (parts[0] && parts[0] !== 'sarah' && parts[0] !== 'chen') {
+        institutionId = parts[0];
+      }
     }
-    if (!institutionId) {
-      institutionId = 'inst-001';
+    if (!institutionId || institutionId === 'inst-001') {
+      // Check if token or header provided specific institution
+      if (instHeader && instHeader !== 'inst-001') {
+        institutionId = instHeader;
+      } else {
+        institutionId = 'inst-001';
+      }
     }
 
     req.user = {
@@ -60,6 +67,7 @@ export const requireAuth = (req: AuthenticatedRequest, res: Response, next: Next
       institutionId,
       name,
     };
+    (req as any).institution_id = institutionId;
 
     return next();
   }

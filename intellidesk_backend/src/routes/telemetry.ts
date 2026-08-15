@@ -48,6 +48,16 @@ telemetryRouter.post('/funds/allocate', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Valid positive allocation amount is required.' });
     }
 
+    // Ensure parent institution exists in Supabase to guarantee foreign key integrity
+    try {
+      await supabase.from('institutions').upsert({
+        id: instId,
+        name: instId === 'inst-001' ? 'Apex Health & Medical Center' : instId,
+        domain: req.body.domain || 'campushealth.edu',
+        default_currency: currency || 'INR',
+      });
+    } catch (_) {}
+
     // Check if fund already exists for this institution and category
     const { data: existingFund } = await supabase
       .from('health_funds')

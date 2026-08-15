@@ -5,8 +5,16 @@ async function runHealthFundsTest() {
   console.log('--- 🧪 STARTING HEALTH FUNDS SUITE TEST ---');
   const instId = 'inst-001';
 
-  // 1. Clean existing test funds for inst-001 to start fresh
-  console.log('\n1. Clearing test funds for institution:', instId);
+  // 1. Ensure institution exists in Supabase
+  console.log('\n1. Ensuring institution exists:', instId);
+  await supabase.from('institutions').upsert({
+    id: instId,
+    name: 'Apex Health & Medical Center',
+    domain: 'apexhealth.edu',
+    default_currency: 'INR',
+  });
+
+  // Clear existing test funds for inst-001
   await supabase.from('health_funds').delete().eq('institution_id', instId);
 
   // 2. Allocate Fund 1: Emergency Inpatient & Trauma Pool

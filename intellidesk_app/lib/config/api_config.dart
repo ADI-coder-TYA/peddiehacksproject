@@ -17,7 +17,13 @@ class ApiConfig {
 
   static String get socketUrl => host;
 
-  static const String institutionId = 'inst-001';
+  static String institutionId = 'inst-001';
+  static String? currentInstitutionId;
+
+  static String get activeInstitutionId =>
+      (currentInstitutionId != null && currentInstitutionId!.isNotEmpty)
+          ? currentInstitutionId!
+          : institutionId;
 
   // Demo fallback credentials
   static const String defaultAdminToken = 'jwt_mock_token_admin_sarah_chen';
@@ -38,7 +44,7 @@ class ApiConfig {
   static Map<String, String> get patientHeaders {
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      'x-institution-id': institutionId,
+      'x-institution-id': activeInstitutionId,
       'x-user-role': userRole ?? 'PATIENT',
       if (authToken != null) 'Authorization': 'Bearer $authToken',
     };
@@ -54,7 +60,7 @@ class ApiConfig {
   static Map<String, String> get adminHeaders {
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      'x-institution-id': institutionId,
+      'x-institution-id': activeInstitutionId,
       'x-user-role': userRole ?? defaultAdminRole,
       'Authorization': 'Bearer ${authToken ?? defaultAdminToken}',
     };
@@ -67,7 +73,7 @@ class ApiConfig {
   /// Returns standard headers for admin requests without Content-Type (GET, DELETE, Multipart)
   static Map<String, String> get adminAuthHeaders {
     final headers = <String, String>{
-      'x-institution-id': institutionId,
+      'x-institution-id': activeInstitutionId,
       'x-user-role': userRole ?? defaultAdminRole,
       'Authorization': 'Bearer ${authToken ?? defaultAdminToken}',
     };
