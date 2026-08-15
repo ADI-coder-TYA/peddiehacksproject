@@ -25,6 +25,8 @@ class UserProfile {
     this.token,
   });
 
+  String get fullName => name;
+
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
       id: json['id']?.toString() ?? '',
