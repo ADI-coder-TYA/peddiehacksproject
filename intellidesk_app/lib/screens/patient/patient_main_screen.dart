@@ -129,7 +129,9 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
       case 1:
         return const ClinicalChatScreen();
       case 2:
-        return const ClaimStatusScreen(claimId: 'CLM-DEMO-01');
+        return ClaimStatusScreen(
+          onNavigateToClaims: () => setState(() => _selectedIndex = 0),
+        );
       case 3:
         return const UserProfileScreen();
       default:

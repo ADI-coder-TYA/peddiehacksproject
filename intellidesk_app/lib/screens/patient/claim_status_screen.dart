@@ -1,15 +1,23 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import '../../config/api_config.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/glass_card.dart';
 import 'clinical_chat_screen.dart';
 
 class ClaimStatusScreen extends StatefulWidget {
-  final String claimId;
+  final String? claimId;
+  final VoidCallback? onNavigateToClaims;
 
-  const ClaimStatusScreen({super.key, required this.claimId});
+  const ClaimStatusScreen({
+    super.key,
+    this.claimId,
+    this.onNavigateToClaims,
+  });
 
   @override
   State<ClaimStatusScreen> createState() => _ClaimStatusScreenState();
@@ -17,13 +25,17 @@ class ClaimStatusScreen extends StatefulWidget {
 
 class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
   IO.Socket? _socket;
-  Map<String, dynamic>? _claimData;
+  List<Map<String, dynamic>> _claims = [];
+  Map<String, dynamic>? _selectedClaim;
   bool _isLoading = true;
+  String _statusFilter = 'All';
+
+  final List<String> _filters = ['All', 'Active', 'Approved', 'Disbursed', 'Flagged'];
 
   @override
   void initState() {
     super.initState();
-    _fetchClaimStatus();
+    _fetchClaims();
     _initSocket();
   }
 
@@ -42,45 +54,70 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
       });
 
       _socket?.onConnect((_) {
-        _socket?.emit('join_claim', widget.claimId);
-        _socket?.emit('join_ticket', widget.claimId);
+        if (_selectedClaim != null) {
+          final id = _selectedClaim!['id']?.toString() ?? '';
+          if (id.isNotEmpty) {
+            _socket?.emit('join_claim', id);
+            _socket?.emit('join_ticket', id);
+          }
+        }
       });
 
       _socket?.on('claim:updated', (data) {
         if (mounted && data != null) {
-          setState(() {
-            _claimData = Map<String, dynamic>.from(data);
-          });
+          _fetchClaims(silent: true);
+        }
+      });
+
+      _socket?.on('job:progress', (data) {
+        if (mounted && data != null) {
+          _fetchClaims(silent: true);
         }
       });
 
       _socket?.on('claim:disbursed', (data) {
         if (mounted && data != null) {
-          setState(() {
-            _claimData = {
-              ...?_claimData,
-              'status': 'Disbursed',
-              'approved_amount': data['approvedAmount'],
-              'payout_reference': data['payoutReference'],
-              'payout_method': data['payoutMethod'],
-            };
-          });
+          _fetchClaims(silent: true);
         }
       });
     } catch (_) {}
   }
 
-  Future<void> _fetchClaimStatus() async {
+  Future<void> _fetchClaims({bool silent = false}) async {
+    if (!silent) {
+      setState(() => _isLoading = true);
+    }
     try {
+      final queryParams = <String, String>{
+        if (ApiConfig.userPhone != null) 'phone': ApiConfig.userPhone!,
+        if (ApiConfig.userEmail != null) 'email': ApiConfig.userEmail!,
+      };
+      final uri = Uri.parse('${ApiConfig.baseUrl}/claims').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+
       final response = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/claims/${widget.claimId}'),
-      );
+        uri,
+        headers: ApiConfig.patientHeaders,
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final List<dynamic> data = jsonDecode(response.body);
+        final list = data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+
         if (mounted) {
           setState(() {
-            _claimData = data;
+            _claims = list;
+            if (_claims.isNotEmpty) {
+              if (widget.claimId != null) {
+                _selectedClaim = _claims.firstWhere(
+                  (c) => c['id']?.toString() == widget.claimId,
+                  orElse: () => _claims.first,
+                );
+              } else {
+                _selectedClaim ??= _claims.first;
+              }
+            } else {
+              _selectedClaim = null;
+            }
             _isLoading = false;
           });
         }
@@ -88,180 +125,337 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
       }
     } catch (_) {}
 
-    // Fallback default claim data
     if (mounted) {
       setState(() {
-        _claimData = {
-          'id': widget.claimId,
-          'status': 'Triage Complete',
-          'esi_level': 'ESI_2_EMERGENT',
-          'crisis_severity_index': 0.72,
-          'extracted_bill_amount': 4500.0,
-          'currency': 'INR',
-          'recommended_copay_amount': 3600.0,
-          'clinical_category': 'Medical Emergency & Inpatient Care',
-          'description': 'Emergency room hospitalization & acute symptom relief.',
-          'created_at': DateTime.now().toIso8601String(),
-        };
         _isLoading = false;
       });
     }
   }
 
-  int _getCurrentStep() {
-    final status = (_claimData?['status'] ?? '').toString().toUpperCase();
-    if (status.contains('DISBURSED') || status.contains('APPROVED')) return 3;
-    if (status.contains('VERIF') || status.contains('INVOICE') || status.contains('TRIAGE COMPLETE')) return 2;
-    if (status.contains('ACTIVE') || status.contains('TRIAGE')) return 1;
+  List<Map<String, dynamic>> get _filteredClaims {
+    if (_statusFilter == 'All') return _claims;
+    return _claims.where((c) {
+      final s = (c['status'] ?? '').toString().toUpperCase();
+      if (_statusFilter == 'Active') return s.contains('ACTIVE') || s.contains('TRIAGE') || s.contains('PENDING');
+      if (_statusFilter == 'Approved') return s.contains('APPROVED');
+      if (_statusFilter == 'Disbursed') return s.contains('DISBURSED');
+      if (_statusFilter == 'Flagged') return s.contains('FLAGGED') || s.contains('DENIED');
+      return true;
+    }).toList();
+  }
+
+  int _getCurrentStep(Map<String, dynamic> claim) {
+    final status = (claim['status'] ?? '').toString().toUpperCase();
+    if (status.contains('DISBURSED') || status.contains('RESOLVED')) return 4;
+    if (status.contains('APPROVED') || status.contains('APPROVAL')) return 3;
+    if (status.contains('VERIF') || status.contains('INVOICE') || status.contains('COMPLETE') || status.contains('SCORED')) return 2;
+    if (status.contains('ACTIVE') || status.contains('TRIAGE') || status.contains('PENDING')) return 1;
     return 0;
   }
 
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Claim Status Tracker')),
-        body: const Center(child: CircularProgressIndicator(color: AppTheme.primaryBrand)),
+      return const Center(
+        child: CircularProgressIndicator(color: Color(0xFF0D9488)),
       );
     }
 
-    final currentStep = _getCurrentStep();
-    final esiLevel = _claimData?['esi_level'] ?? 'ESI_2_EMERGENT';
-    final esiColor = AppTheme.getEsiColor(esiLevel);
-    final esiLabel = AppTheme.getEsiLabel(esiLevel);
-    final currency = _claimData?['currency'] == 'USD' ? '\$' : '₹';
-    final extractedAmount = _claimData?['extracted_bill_amount'] != null ? NumberFormat('#,##0.00').format(_claimData!['extracted_bill_amount']) : '4,500.00';
-    final copayAmount = _claimData?['recommended_copay_amount'] != null ? NumberFormat('#,##0.00').format(_claimData!['recommended_copay_amount']) : '3,600.00';
-    final payoutRef = _claimData?['payout_reference'] ?? 'TXN_MED_${DateTime.now().millisecondsSinceEpoch}_OK';
+    if (_claims.isEmpty) {
+      return _buildEmptyState();
+    }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Claim #${widget.claimId.length > 8 ? widget.claimId.substring(0, 8) : widget.claimId}'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.psychology, color: Colors.white),
-            tooltip: 'Talk to Clinical Counselor',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => ClinicalChatScreen(claimId: widget.claimId)),
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+    return RefreshIndicator(
+      onRefresh: _fetchClaims,
+      color: const Color(0xFF0D9488),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // ESI Badge Card
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: esiColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: esiColor.withOpacity(0.5)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.local_hospital_rounded, color: esiColor, size: 30),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          esiLabel,
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: esiColor),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Category: ${_claimData?['clinical_category'] ?? 'Emergency Care'}',
-                          style: const TextStyle(fontSize: 12, color: AppTheme.textDark),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
+            // 1. Header with active claim title & claim switcher
+            _buildClaimHeader(),
+            const SizedBox(height: 16),
 
-            // Stepper
-            const Text(
-              'Triage & Copay Progress',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 12),
+            // 2. Status Filter Tabs
+            _buildFilterTabs(),
+            const SizedBox(height: 16),
 
-            _buildTimelineTile(
-              stepNumber: 1,
-              title: 'Claim & Symptoms Submitted',
-              subtitle: 'Intake received and queued for NLP distress analysis.',
-              isActive: currentStep >= 0,
-              isDone: currentStep > 0,
-            ),
-            _buildTimelineTile(
-              stepNumber: 2,
-              title: 'Autonomous Clinical Triage (ESI)',
-              subtitle: 'Emergency Severity Index computed: $esiLevel',
-              isActive: currentStep >= 1,
-              isDone: currentStep > 1,
-            ),
-            _buildTimelineTile(
-              stepNumber: 3,
-              title: 'Invoice OCR & Fraud Sentinel',
-              subtitle: 'Verified Hospital Invoice: $currency$extractedAmount | Copay Relief: $currency$copayAmount',
-              isActive: currentStep >= 2,
-              isDone: currentStep > 2,
-            ),
-            _buildTimelineTile(
-              stepNumber: 4,
-              title: 'Copay Relief Disbursed',
-              subtitle: currentStep >= 3
-                  ? 'Disbursed via ${_claimData?['payout_method'] ?? 'RazorpayX / Stripe'} | Ref: $payoutRef'
-                  : 'Pending final automated fund allocation release.',
-              isActive: currentStep >= 3,
-              isDone: currentStep >= 3,
-              isLast: true,
-            ),
-            const SizedBox(height: 28),
+            // 3. Active Claim Card & Triage Stepper
+            if (_selectedClaim != null) ...[
+              _buildActiveClaimDetails(_selectedClaim!),
+              const SizedBox(height: 20),
+            ],
 
-            // Counselor Action Button
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                icon: const Icon(Icons.psychology, color: AppTheme.primaryBrand),
-                label: const Text('24/7 Psychological First Aid & Chat', style: TextStyle(color: AppTheme.primaryBrand, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: AppTheme.primaryBrand),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            // 4. Other Claims List (if multiple exist)
+            if (_filteredClaims.length > 1) ...[
+              Text(
+                'ALL SUBMITTED CLAIMS (${_filteredClaims.length})',
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF64748B),
+                  letterSpacing: 0.5,
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => ClinicalChatScreen(claimId: widget.claimId)),
-                  );
-                },
               ),
-            ),
+              const SizedBox(height: 10),
+              ..._filteredClaims.map((claim) {
+                final isSelected = claim['id'] == _selectedClaim?['id'];
+                return _buildClaimListItem(claim, isSelected);
+              }),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTimelineTile({
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(28.0),
+        child: GlassCard(
+          padding: const EdgeInsets.all(28),
+          borderRadius: 24,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.assignment_outlined, size: 42, color: Color(0xFF0D9488)),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'No Claims Submitted Yet',
+                style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'You have not submitted any medical copay or emergency relief requests yet. Once you submit a claim with your prescription or hospital bill, live AI triage and copay progress will appear here.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.outfit(fontSize: 13, color: const Color(0xFF64748B)),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: widget.onNavigateToClaims,
+                icon: const Icon(Icons.add_circle, size: 18),
+                label: const Text('Submit Emergency / Copay Claim'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0D9488),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClaimHeader() {
+    final rawId = (_selectedClaim?['id'] ?? 'Claim').toString();
+    final shortId = rawId.length > 8 ? rawId.substring(0, 8).toUpperCase() : rawId.toUpperCase();
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Claim #$shortId',
+              style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+            ),
+            Text(
+              '${_claims.length} total request${_claims.length == 1 ? '' : 's'} on record',
+              style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF64748B)),
+            ),
+          ],
+        ),
+        if (_selectedClaim != null)
+          IconButton.filledTonal(
+            icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF0D9488)),
+            tooltip: 'Talk to Clinical Counselor',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ClinicalChatScreen(claimId: rawId)),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFilterTabs() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: _filters.map((f) {
+          final isSelected = _statusFilter == f;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              selected: isSelected,
+              label: Text(
+                f,
+                style: GoogleFonts.outfit(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? Colors.white : const Color(0xFF475569),
+                ),
+              ),
+              selectedColor: const Color(0xFF0D9488),
+              backgroundColor: Colors.white.withValues(alpha: 0.8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: isSelected ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0)),
+              ),
+              onSelected: (_) => setState(() => _statusFilter = f),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildActiveClaimDetails(Map<String, dynamic> claim) {
+    final esiLevel = claim['esi_level']?.toString() ?? 'ESI_2_EMERGENT';
+    final esiColor = AppTheme.getEsiColor(esiLevel);
+    final esiLabel = AppTheme.getEsiLabel(esiLevel);
+    final category = claim['clinical_category']?.toString() ?? 'Medical Emergency & Inpatient Care';
+    final currencySymbol = claim['currency'] == 'USD' ? '\$' : '₹';
+    final extractedAmount = claim['extracted_bill_amount'] != null
+        ? NumberFormat('#,##0.00').format(claim['extracted_bill_amount'])
+        : (claim['calculated_amount'] != null ? NumberFormat('#,##0.00').format(claim['calculated_amount']) : '4,500.00');
+    final copayAmount = claim['recommended_copay_amount'] != null
+        ? NumberFormat('#,##0.00').format(claim['recommended_copay_amount'])
+        : extractedAmount;
+    final currentStep = _getCurrentStep(claim);
+
+    return GlassCard(
+      padding: const EdgeInsets.all(18),
+      borderRadius: 22,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ESI Severity Banner
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: esiColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: esiColor.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.local_hospital, color: esiColor, size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        esiLabel,
+                        style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: esiColor),
+                      ),
+                      Text(
+                        'Category: $category',
+                        style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF475569)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Triage Progress Stepper
+          Text(
+            'Triage & Copay Progress',
+            style: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 14),
+
+          _buildStep(
+            stepNumber: 1,
+            title: 'Claim & Symptoms Submitted',
+            subtitle: 'Intake received and queued for NLP distress analysis.',
+            isDone: currentStep >= 1,
+            isCurrent: currentStep == 1,
+          ),
+          _buildStep(
+            stepNumber: 2,
+            title: 'Autonomous Clinical Triage (ESI)',
+            subtitle: 'Emergency Severity Index computed: $esiLevel',
+            isDone: currentStep >= 2,
+            isCurrent: currentStep == 2,
+          ),
+          _buildStep(
+            stepNumber: 3,
+            title: 'Invoice OCR & Fraud Sentinel',
+            subtitle: 'Verified Hospital Invoice: $currencySymbol$extractedAmount | Copay Relief: $currencySymbol$copayAmount',
+            isDone: currentStep >= 3,
+            isCurrent: currentStep == 3,
+          ),
+          _buildStep(
+            stepNumber: 4,
+            title: currentStep >= 4 ? 'Copay Relief Disbursed ✓' : 'Copay Relief Disbursement',
+            subtitle: currentStep >= 4
+                ? 'Automated fund allocation released to healthcare facility.'
+                : 'Pending final automated fund allocation release.',
+            isDone: currentStep >= 4,
+            isCurrent: currentStep == 4,
+            isLast: true,
+          ),
+          const SizedBox(height: 18),
+
+          // Action: 24/7 Chat
+          OutlinedButton.icon(
+            onPressed: () {
+              final id = (claim['id'] ?? '').toString();
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => ClinicalChatScreen(claimId: id)),
+              );
+            },
+            icon: const Icon(Icons.psychology, size: 18, color: Color(0xFF0D9488)),
+            label: Text(
+              '24/7 Psychological First Aid & Chat',
+              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0D9488)),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFF0D9488)),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStep({
     required int stepNumber,
     required String title,
     required String subtitle,
-    required bool isActive,
     required bool isDone,
+    required bool isCurrent,
     bool isLast = false,
   }) {
-    final color = isDone ? AppTheme.primaryBrand : (isActive ? AppTheme.accentCyan : AppTheme.textMuted);
+    final color = isDone
+        ? const Color(0xFF0D9488)
+        : (isCurrent ? const Color(0xFF0284C7) : const Color(0xFF94A3B8));
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,49 +463,49 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
         Column(
           children: [
             Container(
-              width: 30,
-              height: 30,
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isDone ? AppTheme.primaryBrand : (isActive ? AppTheme.primaryContainer : AppTheme.surfaceSlate),
-                border: Border.all(color: color, width: 1.5),
+                color: isDone ? const Color(0xFF0D9488) : (isCurrent ? const Color(0xFF0284C7).withValues(alpha: 0.15) : const Color(0xFFF1F5F9)),
+                border: Border.all(color: color, width: 2),
               ),
               child: Center(
                 child: isDone
                     ? const Icon(Icons.check, size: 16, color: Colors.white)
                     : Text(
                         '$stepNumber',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: color),
+                        style: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.bold, color: color),
                       ),
               ),
             ),
             if (!isLast)
               Container(
                 width: 2,
-                height: 42,
-                color: isDone ? AppTheme.primaryBrand : AppTheme.borderSubtle,
+                height: 36,
+                color: isDone ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
               ),
           ],
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 18),
+            padding: const EdgeInsets.only(bottom: 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: isActive ? AppTheme.textDark : AppTheme.textMuted,
+                  style: GoogleFonts.outfit(
+                    fontSize: 13,
+                    fontWeight: isDone || isCurrent ? FontWeight.bold : FontWeight.w500,
+                    color: isDone || isCurrent ? const Color(0xFF0F172A) : const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   subtitle,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                  style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF64748B)),
                 ),
               ],
             ),
@@ -320,13 +514,92 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
       ],
     );
   }
-}
 
-class NumberFormat {
-  final String pattern;
-  NumberFormat(this.pattern);
-  String format(dynamic num) {
-    if (num == null) return '0.00';
-    return num.toString();
+  Widget _buildClaimListItem(Map<String, dynamic> claim, bool isSelected) {
+    final rawId = (claim['id'] ?? '').toString();
+    final shortId = rawId.length > 8 ? rawId.substring(0, 8).toUpperCase() : rawId.toUpperCase();
+    final status = (claim['status'] ?? 'Active').toString();
+    final category = (claim['clinical_category'] ?? 'Emergency Care').toString();
+    final createdStr = claim['created_at'] != null
+        ? DateFormat('MMM d • h:mm a').format(DateTime.tryParse(claim['created_at'].toString()) ?? DateTime.now())
+        : 'Recent';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => setState(() => _selectedClaim = claim),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFF0D9488).withValues(alpha: 0.08) : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? const Color(0xFF0D9488) : const Color(0xFFE2E8F0),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isSelected ? const Color(0xFF0D9488) : const Color(0xFFF1F5F9),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.receipt_long,
+                  size: 20,
+                  color: isSelected ? Colors.white : const Color(0xFF64748B),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Claim #$shortId',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: const Color(0xFF0F172A)),
+                        ),
+                        Text(
+                          createdStr,
+                          style: GoogleFonts.outfit(fontSize: 10.5, color: const Color(0xFF94A3B8)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          category,
+                          style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF64748B)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF0D9488).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            status.toUpperCase(),
+                            style: GoogleFonts.outfit(fontSize: 9, fontWeight: FontWeight.bold, color: const Color(0xFF0D9488)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

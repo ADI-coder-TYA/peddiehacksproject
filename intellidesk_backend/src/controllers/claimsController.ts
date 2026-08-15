@@ -13,8 +13,11 @@ export class ClaimsController {
    */
   static async getClaims(req: Request, res: Response): Promise<void> {
     try {
-      const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.query.institutionId as string) || 'default')) as string;
+      const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || (req.query.institutionId as string) || 'default')) as string;
       const { esiLevel, status, search, limit = '50' } = req.query;
+      const userRole = ((req.headers['x-user-role'] as string) || (req as any).user?.role || '').toUpperCase();
+      const patientPhone = (req.query.patientPhone || req.query.phone || req.headers['x-user-phone']) as string | undefined;
+      const patientEmail = (req.query.email || req.headers['x-user-email']) as string | undefined;
 
       let query = supabase
         .from('claims')
@@ -27,6 +30,18 @@ export class ClaimsController {
       if (instId && instId !== 'default' && instId !== 'all') {
         query = query.eq('institution_id', instId);
       }
+
+      // If patient user or patient filter specified, restrict strictly to that patient's records
+      if (userRole === 'PATIENT' || userRole === 'STUDENT' || patientPhone || patientEmail) {
+        if (patientPhone && patientEmail) {
+          query = query.or(`patient_phone.eq.${patientPhone},patient_phone.ilike.%${patientPhone}%,description.ilike.%${patientEmail}%,clinical_notes.ilike.%${patientEmail}%`);
+        } else if (patientPhone) {
+          query = query.or(`patient_phone.eq.${patientPhone},patient_phone.ilike.%${patientPhone}%`);
+        } else if (patientEmail) {
+          query = query.or(`description.ilike.%${patientEmail}%,clinical_notes.ilike.%${patientEmail}%`);
+        }
+      }
+
       if (esiLevel) {
         query = query.eq('esi_level', esiLevel);
       }
@@ -39,33 +54,9 @@ export class ClaimsController {
 
       const { data: claims, error } = await query;
 
-      if (!error && claims && claims.length > 0) {
-        res.status(200).json(claims);
-        return;
-      }
-
-      // If specific institution had 0 results, try fetching all claims
-      if (!error && (!claims || claims.length === 0) && instId && instId !== 'default') {
-        const { data: allClaims } = await supabase
-          .from('claims')
-          .select('*')
-          .order('crisis_severity_index', { ascending: false })
-          .limit(Number(limit));
-        if (allClaims && allClaims.length > 0) {
-          res.status(200).json(allClaims);
-          return;
-        }
-      }
-
       if (error) {
-        // Fallback to tickets table
-        const { data: tickets } = await supabase
-          .from('tickets')
-          .select('*')
-          .order('crisis_severity_index', { ascending: false })
-          .limit(Number(limit));
-
-        res.status(200).json(tickets || []);
+        console.error('[ClaimsController.getClaims] Supabase Error:', error);
+        res.status(200).json([]);
         return;
       }
 
