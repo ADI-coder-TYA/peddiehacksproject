@@ -407,77 +407,115 @@ class _AdminHealthFundsScreenState extends State<AdminHealthFundsScreen> {
   Widget build(BuildContext context) {
     final currencyFmt = NumberFormat.currency(symbol: CurrencyFormatter.getSymbol('INR'), decimalDigits: 0);
 
-    return RefreshIndicator(
-      onRefresh: _loadFunds,
-      color: const Color(0xFF0D9488),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 1. Top Aggregate Reserves Metric Banner
-            GlassCard(
-              padding: const EdgeInsets.all(20),
-              borderRadius: 24,
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF0D9488), Color(0xFF0284C7)],
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAllocateFundModal(),
+        backgroundColor: const Color(0xFF0D9488),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        icon: const Icon(Icons.add_card, size: 20),
+        label: Text(
+          'Allocate Health Fund',
+          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadFunds,
+        color: const Color(0xFF0D9488),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 1. Top Aggregate Reserves Metric Banner
+              GlassCard(
+                padding: const EdgeInsets.all(20),
+                borderRadius: 24,
+                child: Column(
+                  children: [
+                    LayoutBuilder(
+                      builder: (context, headerConstraints) {
+                        final isHeaderNarrow = headerConstraints.maxWidth < 480;
+
+                        final headerTitle = Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF0D9488), Color(0xFF0284C7)],
+                                ),
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              borderRadius: BorderRadius.circular(14),
+                              child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 22),
                             ),
-                            child: const Icon(Icons.account_balance_wallet, color: Colors.white, size: 22),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Institutional Health Funds',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: const Color(0xFF0F172A),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  Text(
+                                    '${_funds.length} Active Copay & Relief Pools',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 12,
+                                      color: const Color(0xFF64748B),
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+
+                        final allocateBtn = ElevatedButton.icon(
+                          onPressed: () => _showAllocateFundModal(),
+                          icon: const Icon(Icons.add_circle, size: 18),
+                          label: Text(
+                            'Allocate Fund',
+                            style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
                           ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D9488),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            elevation: 0,
+                          ),
+                        );
+
+                        if (isHeaderNarrow) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
-                              Text(
-                                'Institutional Health Fund Pools',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                              Text(
-                                '${_funds.length} Active Copay & Emergency Pools',
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
+                              headerTitle,
+                              const SizedBox(height: 14),
+                              allocateBtn,
                             ],
-                          ),
-                        ],
-                      ),
-                      ElevatedButton.icon(
-                        onPressed: () => _showAllocateFundModal(),
-                        icon: const Icon(Icons.add_circle, size: 18),
-                        label: Text(
-                          'Allocate New Fund',
-                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF0D9488),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          elevation: 0,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            Expanded(child: headerTitle),
+                            const SizedBox(width: 12),
+                            allocateBtn,
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 20),
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final isNarrow = constraints.maxWidth < 600;
@@ -621,8 +659,9 @@ class _AdminHealthFundsScreenState extends State<AdminHealthFundsScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildSummaryMetric(String title, String value, Color color, IconData icon) {
     return Container(

@@ -257,7 +257,15 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
   }
 
   Widget _buildAdminHeader(bool isMobile, bool isConnected, dynamic user) {
-    final titles = ['Clinical Claims & Emergency Copays', 'Institutional Clinical Telemetry', 'HIPAA Compliance & Tamper Logs', 'Clinical Crisis War Room', 'Institutional Clinical Policies', 'Medical Administrator Profile'];
+    final titles = [
+      'Clinical Claims & Emergency Copays',
+      'Institutional Clinical Telemetry',
+      'Health Funds & Pool Reserves',
+      'HIPAA Compliance & Tamper Logs',
+      'Clinical Crisis War Room',
+      'Institutional Clinical Policies',
+      'Medical Administrator Profile',
+    ];
     final currentTitle = _selectedIndex < titles.length ? titles[_selectedIndex] : 'Dashboard';
 
     return Container(
@@ -272,7 +280,7 @@ class _AdminMainScreenState extends State<AdminMainScreen> {
             child: InkWell(
               onTap: () {
                 setState(() {
-                  _selectedIndex = 5; // Switch to Profile tab
+                  _selectedIndex = 6; // Switch to Profile tab
                 });
               },
               borderRadius: BorderRadius.circular(12),
