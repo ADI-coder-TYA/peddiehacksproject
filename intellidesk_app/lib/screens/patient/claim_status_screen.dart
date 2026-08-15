@@ -446,6 +446,41 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
               ],
             ),
           ),
+          if ((claim['clinical_notes']?.toString().contains('No pre-configured policy') ?? false) ||
+              (claim['clinical_notes']?.toString().contains('Discretionary Review') ?? false)) ...[
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFFD97706), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Institutional Policy Notice',
+                          style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 12, color: const Color(0xFFB45309)),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'No pre-configured institutional policy matched "$category". Your emergency request has been routed to the Healthcare Review Board for discretionary copay assistance.',
+                          style: GoogleFonts.outfit(fontSize: 11, color: const Color(0xFF92400E)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 18),
 
           // Triage Progress Stepper

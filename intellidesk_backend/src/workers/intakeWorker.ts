@@ -204,6 +204,8 @@ export const intakeWorker = new Worker(
       let policyLimit = effectiveCurrency === 'INR' ? 100000 : 2500;
       let policyCapSource = 'Standard Institutional Baseline';
       let matchedPolicyId: string | null = null;
+      let isPolicyMatched = false;
+
       try {
         const { data: matchedPolicyRows } = await supabase
           .from('policy_embeddings')
@@ -215,11 +217,59 @@ export const intakeWorker = new Worker(
 
         if (matchedPolicyRows && matchedPolicyRows.length > 0) {
           matchedPolicyId = matchedPolicyRows[0].id;
+          isPolicyMatched = true;
           const matchedLimit = Number(matchedPolicyRows[0].max_coverage_limit);
           if (matchedLimit > 0) {
             policyLimit = matchedLimit;
             policyCapSource = `${matchedPolicyRows[0].policy_name} (₹${policyLimit})`;
           }
+        } else {
+          // No specific policy matched for this category
+          isPolicyMatched = false;
+          policyCapSource = 'Out-of-Policy Discretionary Review';
+
+          // Attempt fallback to general institutional policy
+          const { data: generalPolicies } = await supabase
+            .from('policy_embeddings')
+            .select('id, policy_name, max_coverage_limit')
+            .eq('institution_id', instId)
+            .ilike('category', '%General%')
+            .limit(1);
+
+          if (generalPolicies && generalPolicies.length > 0) {
+            matchedPolicyId = generalPolicies[0].id;
+          }
+
+          // 1. Send automated user notification into claim_messages
+          const policyNoticeText = `⚠️ Institutional Policy Notice: We could not find a pre-configured institutional health policy directly matching your treatment category ("${parsedCategory}").\n\nYour emergency claim has been registered and forwarded to the Institutional Healthcare Review Board for discretionary copay assistance. You will receive an update once review is complete.`;
+
+          try {
+            await supabase.from('claim_messages').insert([{
+              claim_id: claimId,
+              sender: 'COUNSELOR_AI',
+              message: policyNoticeText,
+              is_crisis_response: false,
+            }]);
+          } catch (mErr) {
+            console.warn('[IntakeWorker] Policy notice insert warning:', mErr);
+          }
+
+          // 2. Emit Real-time Socket Notification
+          try {
+            getIO().emit('claim:policy_unmatched', {
+              claimId,
+              category: parsedCategory,
+              institutionId: instId,
+              message: policyNoticeText,
+            });
+            getIO().emit('notification:created', {
+              type: 'POLICY_UNMATCHED',
+              claimId,
+              title: 'Policy Review Notice',
+              message: `No pre-configured policy for "${parsedCategory}". Forwarded for discretionary review.`,
+              createdAt: new Date().toISOString(),
+            });
+          } catch (_) {}
         }
       } catch (_) {}
 
@@ -293,7 +343,9 @@ export const intakeWorker = new Worker(
       const clinicalNotes = [
         `• 🩺 ESI Triage: Evaluated as ${esiLevel} (Score: ${csiScore.toFixed(3)})`,
         `• 🧾 Invoice: Verified ${effectiveCurrency} ${invoiceLabel}`,
-        `• 📋 Policy Cap: ${policyCapSource} [Max Cap: ${currencySymbol}${policyLimit}]`,
+        isPolicyMatched
+          ? `• 📋 Policy Cap: ${policyCapSource} [Max Cap: ${currencySymbol}${policyLimit}]`
+          : `• ⚠️ Policy Match Notice: No pre-configured policy for "${parsedCategory}". Forwarded for Institutional Discretionary Review.`,
         `• 🛡️ Fraud Sentinel: ${isFlagged ? `FLAGGED (${fraudReport.flagReasons.join(', ')})` : `Clean (Risk: ${riskScore})`}`,
         `• 💳 Copay Allocation: Recommended ${currencySymbol}${finalCopay.toFixed(2)} based on ${esiLevel} clinical tier.`,
         isLifeSafetyAlert ? `• 🚨 LIFE SAFETY OVERRIDE: ${lifeSafety.crisisHotlineText}` : null,
