@@ -601,23 +601,29 @@ class CrisisTrendChart extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blueAccent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.blueAccent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(Icons.show_chart, color: Colors.blueAccent, size: 22),
                         ),
-                        child: const Icon(Icons.show_chart, color: Colors.blueAccent, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'Crisis Volume & Severity Forecast',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F1B2C)),
-                      ),
-                    ],
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Crisis Volume & Severity Forecast',
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1F1B2C)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
