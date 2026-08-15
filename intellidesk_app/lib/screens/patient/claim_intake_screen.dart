@@ -357,24 +357,42 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
               // Submit Button
               SizedBox(
                 width: double.infinity,
-                height: 50,
+                height: 52,
                 child: ElevatedButton(
                   onPressed: _isSubmitting ? null : _submitClaim,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryBrand,
+                    foregroundColor: Colors.white,
+                    elevation: 3,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                   ),
                   child: _isSubmitting
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
                         )
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.send_rounded, size: 18),
+                            Icon(Icons.send_rounded, size: 20, color: Colors.white),
                             SizedBox(width: 8),
-                            Text('Submit for Autonomous Triage & Copay', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            Flexible(
+                              child: Text(
+                                'Submit for Autonomous Triage & Copay',
+                                overflow: TextOverflow.ellipsis,
+                                maxLines: 1,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
                 ),
