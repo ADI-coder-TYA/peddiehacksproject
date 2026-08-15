@@ -102,7 +102,7 @@ class _ClinicalChatScreenState extends State<ClinicalChatScreen> {
           'email': ApiConfig.userEmail ?? '',
           'institutionId': ApiConfig.activeInstitutionId,
         }),
-      );
+      ).timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -254,7 +254,7 @@ class _ClinicalChatScreenState extends State<ClinicalChatScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryBrand),
                           ),
                           SizedBox(width: 8),
-                          Text('Counselor is typing with Qwen PFA...', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
+                          Text('Counselor is typing...', style: TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                         ],
                       ),
                     ),
