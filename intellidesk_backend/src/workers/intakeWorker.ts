@@ -200,19 +200,21 @@ export const intakeWorker = new Worker(
 
       const isFlagged = fraudReport.isFlagged;
 
-      // 10.5. Resolve Per-Incident Policy Cap from Knowledge Base
+      // 10.5. Resolve Per-Incident Policy Cap & Matched Policy ID from Knowledge Base
       let policyLimit = effectiveCurrency === 'INR' ? 100000 : 2500;
       let policyCapSource = 'Standard Institutional Baseline';
+      let matchedPolicyId: string | null = null;
       try {
         const { data: matchedPolicyRows } = await supabase
           .from('policy_embeddings')
-          .select('policy_name, max_coverage_limit, category')
+          .select('id, policy_name, max_coverage_limit, category')
           .eq('institution_id', instId)
           .or(`category.ilike.%${parsedCategory}%,policy_name.ilike.%${parsedCategory}%`)
           .order('max_coverage_limit', { ascending: false })
           .limit(1);
 
         if (matchedPolicyRows && matchedPolicyRows.length > 0) {
+          matchedPolicyId = matchedPolicyRows[0].id;
           const matchedLimit = Number(matchedPolicyRows[0].max_coverage_limit);
           if (matchedLimit > 0) {
             policyLimit = matchedLimit;
@@ -220,6 +222,47 @@ export const intakeWorker = new Worker(
           }
         }
       } catch (_) {}
+
+      // 10.6. Resolve Patient Profile UUID for Foreign Key Binding
+      let resolvedPatientId: string | null = null;
+      try {
+        const cleanPhone = patientPhone.replace(/[^\d]/g, '');
+        const { data: profData } = await supabase
+          .from('profiles')
+          .select('id')
+          .or(`phone.ilike.%${cleanPhone.slice(-8)}%,phone.eq.${patientPhone},email.ilike.%${job.data.email || ''}%`)
+          .maybeSingle();
+
+        if (profData) {
+          resolvedPatientId = profData.id;
+        } else {
+          const { data: rosterData } = await supabase
+            .from('patient_rosters')
+            .select('id, patient_id, email, phone')
+            .or(`phone.ilike.%${cleanPhone.slice(-8)}%,phone.eq.${patientPhone},email.ilike.%${job.data.email || ''}%`)
+            .maybeSingle();
+
+          if (rosterData) {
+            const patientName = rosterData.email ? rosterData.email.split('@')[0].replace(/[._-]/g, ' ') : 'Registered Patient';
+            const { data: createdProf } = await supabase.from('profiles').upsert({
+              id: rosterData.id,
+              email: rosterData.email || `${rosterData.patient_id || cleanPhone}@campushealth.edu`,
+              full_name: patientName,
+              role: 'PATIENT',
+              institution_id: instId,
+              phone: rosterData.phone || patientPhone,
+              emergency_contact: 'Verified Institutional Patient Roster',
+              alerts_enabled: true,
+            }).select('id').maybeSingle();
+
+            if (createdProf) {
+              resolvedPatientId = createdProf.id;
+            }
+          }
+        }
+      } catch (pErr) {
+        console.warn('[IntakeWorker] Patient ID resolution note:', pErr);
+      }
 
       // 11. Calculate Copay Recommendation with Per-Incident Cap
       let finalCopay = 0.00;
@@ -242,7 +285,7 @@ export const intakeWorker = new Worker(
         }
       }
 
-      // 12. Construct Clinical Audit Notes
+      // 12. Construct Clinical Audit Notes & Payout Disbursal Allocation
       const currencySymbol = effectiveCurrency === 'INR' ? '₹' : '$';
       const riskScore = (fraudReport?.riskScore || 0.0).toFixed(2);
       const invoiceLabel = effectiveReceiptAmount ? `${currencySymbol}${effectiveReceiptAmount}` : 'Unattached / Self-Reported';
@@ -256,19 +299,34 @@ export const intakeWorker = new Worker(
         isLifeSafetyAlert ? `• 🚨 LIFE SAFETY OVERRIDE: ${lifeSafety.crisisHotlineText}` : null,
       ].filter(Boolean).join('\n');
 
-      const claimStatus: ClaimStatus = isFlagged ? 'Flagged' : 'Triage Active';
+      let claimStatus: ClaimStatus = isFlagged ? 'Flagged' : 'Triage Active';
+      let approvedAmount = 0.00;
+      let payoutReference: string = isFlagged ? 'FLAGGED_AUDIT_REQUIRED' : 'PENDING_APPROVAL';
+      let payoutMethod: string = isFlagged ? 'HELD_FOR_ADMIN_AUDIT' : 'DIRECT_HEALTHCARE_FACILITY';
+
+      if (!isFlagged && (esiLevel === 'ESI_1_CRITICAL' || esiLevel === 'ESI_2_EMERGENT')) {
+        claimStatus = 'Approved';
+        approvedAmount = finalCopay;
+        payoutMethod = effectiveCurrency === 'INR' ? 'RAZORPAY_INSTANT' : 'DIRECT_ACH';
+        payoutReference = `TXN_MED_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+      }
 
       // 13. Update Database Write (claims primary table)
       const claimUpdatePayload: Record<string, any> = {
         status: claimStatus,
+        patient_id: resolvedPatientId,
         esi_level: esiLevel,
         crisis_severity_index: csiScore,
         is_life_safety_alert: isLifeSafetyAlert,
         receipt_image_hash: fraudReport?.imageHash || null,
         extracted_bill_amount: effectiveReceiptAmount || null,
         recommended_copay_amount: finalCopay,
+        approved_amount: approvedAmount,
+        payout_reference: payoutReference,
+        payout_method: payoutMethod,
         fraud_risk_score: fraudReport?.riskScore || 0.0,
-        fraud_flags: fraudReport?.flagReasons?.join(' | ') || null,
+        fraud_flags: isFlagged ? (fraudReport?.flagReasons?.join(' | ') || 'SUSPICIOUS_ANOMALY') : 'CLEAN_VERIFIED',
+        matched_policy_id: matchedPolicyId,
         clinical_notes: clinicalNotes,
         clinical_category: parsedCategory,
         currency: effectiveCurrency,

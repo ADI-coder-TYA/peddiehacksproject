@@ -79,6 +79,10 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
       final payload = {
         'studentPhone': patientPhone,
         'patientPhone': patientPhone,
+        'studentName': auth.user?.fullName ?? 'Registered Patient',
+        'patientName': auth.user?.fullName ?? 'Registered Patient',
+        'studentId': auth.user?.studentId,
+        'patientId': auth.user?.id ?? auth.user?.studentId,
         'email': auth.user?.email ?? ApiConfig.userEmail,
         'description': _descController.text.trim(),
         'message': _descController.text.trim(),

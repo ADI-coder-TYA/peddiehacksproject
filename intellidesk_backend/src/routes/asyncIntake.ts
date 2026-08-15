@@ -204,8 +204,9 @@ asyncIntakeRouter.post('/web', checkBackpressure, tenantScopeMiddleware, upload.
       media_url: mediaUrl,
       attachmentUrl: mediaUrl,
       studentName: parsedData.studentName || 'Anonymous',
-      studentPhone: parsedData.studentContact || 'web-client',
-      patientPhone: parsedData.studentContact || 'web-client',
+      studentPhone: patientContact,
+      patientPhone: patientContact,
+      email: req.body.email || req.headers['x-user-email'] || '',
       institutionId,
       source: 'web'
     }, {
