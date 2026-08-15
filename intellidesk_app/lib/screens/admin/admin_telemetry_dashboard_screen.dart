@@ -8,7 +8,6 @@ import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'package:http/http.dart' as http;
 import '../../services/api_service.dart';
 import '../../widgets/glass_card.dart';
-import '../../widgets/stress_test_modal.dart';
 import '../../utils/currency_formatter.dart';
 
 // ============================================================================
@@ -248,111 +247,49 @@ class TelemetryProvider extends ChangeNotifier {
 // ============================================================================
 // 3. Live Fund Budget Gauges & Burn Rate Card
 // ============================================================================
-class BudgetUtilizationCard extends StatelessWidget {
+class BudgetUtilizationCard extends StatefulWidget {
   const BudgetUtilizationCard({super.key});
+
+  @override
+  State<BudgetUtilizationCard> createState() => _BudgetUtilizationCardState();
+}
+
+class _BudgetUtilizationCardState extends State<BudgetUtilizationCard> {
+  final ApiService _apiService = ApiService();
+  List<Map<String, dynamic>> _funds = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFunds();
+  }
+
+  Future<void> _loadFunds() async {
+    try {
+      final funds = await _apiService.fetchHealthFunds();
+      if (mounted) {
+        setState(() {
+          _funds = funds;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final currencyFormat = NumberFormat.currency(symbol: CurrencyFormatter.getSymbol('INR'), decimalDigits: 0);
-    return Consumer<TelemetryProvider>(
-      builder: (context, provider, _) {
-        final data = provider.data;
-        const double totalFinAid = 50000.0;
-        const double totalAlumni = 25000.0;
 
-        final finAidProgress = data.financialAidDisbursed / totalFinAid;
-        final alumniProgress = data.alumniFundDisbursed / totalAlumni;
-
-        return GlassCard(
-          padding: const EdgeInsets.all(18.0),
-          borderRadius: 20,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0D9488).withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.account_balance_wallet, color: Color(0xFF0D9488), size: 22),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Live Fund Utilization & Pool Reserves',
-                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F1B2C)),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: () => _showAllocateFundDialog(context, provider),
-                    icon: const Icon(Icons.add_circle_outline, size: 16),
-                    label: const Text('Allocate Funds', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0D9488),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              // Financial Aid Fund Gauge
-              _buildBudgetGauge(
-                title: 'Emergency Relief Pool',
-                disbursed: data.financialAidDisbursed,
-                remaining: data.financialAidRemaining,
-                progress: finAidProgress.clamp(0.0, 1.0),
-                estimatedDays: data.estimatedDaysFinancialAid,
-                color: const Color(0xFF0D9488),
-                format: currencyFormat,
-              ),
-              const SizedBox(height: 20),
-
-              // Alumni Fund Gauge
-              _buildBudgetGauge(
-                title: 'Alumni & Donor Copay Reserve',
-                disbursed: data.alumniFundDisbursed,
-                remaining: data.alumniFundRemaining,
-                progress: alumniProgress.clamp(0.0, 1.0),
-                estimatedDays: data.estimatedDaysAlumniFund,
-                color: const Color(0xFF0284C7),
-                format: currencyFormat,
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _showAllocateFundDialog(BuildContext context, TelemetryProvider provider) {
-    final nameCtrl = TextEditingController(text: 'Apex Emergency Copay & Relief Pool');
-    final amountCtrl = TextEditingController(text: '50000');
-    String selectedCategory = 'Emergency Inpatient & Trauma';
-    final formKey = GlobalKey<FormState>();
-    bool isSubmitting = false;
-
-    final categories = [
-      'Emergency Inpatient & Trauma',
-      'Prescription & Pharmacy Copay',
-      'Diagnostic, Lab & Imaging Relief',
-      'Mental Health & Tele-Counseling',
-      'General Healthcare Welfare Pool',
-    ];
-
-    showDialog(
-      context: context,
-      builder: (dialogCtx) => StatefulBuilder(
-        builder: (context, setModalState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+    return GlassCard(
+      padding: const EdgeInsets.all(18.0),
+      borderRadius: 20,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
@@ -360,144 +297,70 @@ class BudgetUtilizationCard extends StatelessWidget {
                   color: const Color(0xFF0D9488).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.add_card, color: Color(0xFF0D9488), size: 24),
+                child: const Icon(Icons.account_balance_wallet, color: Color(0xFF0D9488), size: 22),
               ),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
-                  'Allocate Health Funds',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  'Live Fund Utilization & Pool Reserves',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F1B2C)),
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ),
+              IconButton(
+                onPressed: _loadFunds,
+                icon: const Icon(Icons.refresh, size: 18, color: Color(0xFF64748B)),
+                tooltip: 'Refresh Balances',
               ),
             ],
           ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Inject or top up emergency health fund reserves for instant patient copay approvals.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: nameCtrl,
-                    decoration: InputDecoration(
-                      labelText: 'Fund Pool Name',
-                      prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                    validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 14),
-                  DropdownButtonFormField<String>(
-                    value: selectedCategory,
-                    decoration: InputDecoration(
-                      labelText: 'Clinical Category',
-                      prefixIcon: const Icon(Icons.category_outlined, size: 20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                    items: categories.map((c) => DropdownMenuItem(value: c, child: Text(c, style: const TextStyle(fontSize: 13)))).toList(),
-                    onChanged: (val) {
-                      if (val != null) setModalState(() => selectedCategory = val);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: amountCtrl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: 'Allocation Amount (₹)',
-                      prefixIcon: const Icon(Icons.currency_rupee, size: 20),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Required';
-                      final numVal = double.tryParse(v);
-                      if (numVal == null || numVal <= 0) return 'Enter a positive amount';
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [25000, 50000, 100000, 250000].map((quickAmt) {
-                      return ActionChip(
-                        label: Text('+₹${NumberFormat.compact().format(quickAmt)}', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0D9488))),
-                        backgroundColor: const Color(0xFF0D9488).withValues(alpha: 0.08),
-                        onPressed: () {
-                          setModalState(() {
-                            amountCtrl.text = quickAmt.toString();
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: isSubmitting ? null : () => Navigator.of(dialogCtx).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: isSubmitting
-                  ? null
-                  : () async {
-                      if (!formKey.currentState!.validate()) return;
-                      setModalState(() => isSubmitting = true);
-                      try {
-                        final amt = double.parse(amountCtrl.text.trim());
-                        final res = await ApiService().allocateHealthFund(
-                          name: nameCtrl.text.trim(),
-                          category: selectedCategory,
-                          amount: amt,
-                          currency: 'INR',
-                        );
-                        if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-                        provider.retry();
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(res['message'] ?? 'Successfully allocated ₹$amt to health fund pool!'),
-                              backgroundColor: const Color(0xFF0D9488),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        setModalState(() => isSubmitting = false);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Allocation failed: $e'),
-                              backgroundColor: const Color(0xFFDC2626),
-                            ),
-                          );
-                        }
-                      }
-                    },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0D9488),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: isSubmitting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Confirm Allocation', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
+          const SizedBox(height: 16),
+          if (_isLoading)
+            const Center(child: Padding(padding: EdgeInsets.all(16.0), child: CircularProgressIndicator()))
+          else if (_funds.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.0),
+              child: Text('No active health funds allocated yet.', style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+            )
+          else
+            ..._funds.map((fund) {
+              final String name = fund['name'] ?? 'Relief Pool';
+              final String category = fund['category'] ?? 'General Healthcare';
+              final double allocated = (num.tryParse(fund['total_allocated']?.toString() ?? '0') ?? 100000).toDouble();
+              final double disbursed = (num.tryParse(fund['total_disbursed']?.toString() ?? '0') ?? 0).toDouble();
+              final double remaining = (allocated - disbursed).clamp(0.0, double.infinity);
+              final double progress = allocated > 0 ? (disbursed / allocated).clamp(0.0, 1.0) : 0.0;
+              final Color color = _getCategoryColor(category);
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: _buildBudgetGauge(
+                  title: name,
+                  disbursed: disbursed,
+                  remaining: remaining,
+                  progress: progress,
+                  estimatedDays: (progress > 0.5) ? 28 : (progress > 0.2 ? 45 : 60),
+                  color: color,
+                  format: currencyFormat,
+                ),
+              );
+            }),
+        ],
       ),
     );
+  }
+
+  Color _getCategoryColor(String category) {
+    if (category.contains('Prescription') || category.contains('Pharmacy')) {
+      return const Color(0xFF0284C7);
+    } else if (category.contains('Diagnostic') || category.contains('Lab')) {
+      return const Color(0xFF8B5CF6);
+    } else if (category.contains('Mental')) {
+      return const Color(0xFFEC4899);
+    } else if (category.contains('Trauma') || category.contains('Emergency')) {
+      return const Color(0xFFDC2626);
+    }
+    return const Color(0xFF0D9488);
   }
 
   Widget _buildBudgetGauge({
@@ -607,11 +470,11 @@ class MLModelHealthGrid extends StatelessWidget {
                   color: const Color(0xFF3B82F6),
                 ),
                 _buildStatCard(
-                  title: 'Auto-Approval Accuracy',
+                  title: 'AI Auto-Approval Rate',
                   value: '${(data.autoApprovalAccuracy * 100).toStringAsFixed(1)}%',
                   trend: '+3.5%',
                   isPositiveTrend: true,
-                  subtitle: 'Uncertainty < 3.5%',
+                  subtitle: 'Autonomous Disbursals',
                   icon: Icons.verified,
                   color: const Color(0xFF10B981),
                 ),
@@ -719,7 +582,7 @@ class MLModelHealthGrid extends StatelessWidget {
 }
 
 // ============================================================================
-// 5. Interactive Crisis Volume & Severity Chart
+// 5. Crisis Volume & Severity Forecast Chart
 // ============================================================================
 class CrisisTrendChart extends StatelessWidget {
   const CrisisTrendChart({super.key});
@@ -728,74 +591,83 @@ class CrisisTrendChart extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<TelemetryProvider>(
       builder: (context, provider, _) {
-        final trend = provider.data.crisisTrend;
-        
-        // Provide dummy data if stream is empty for aesthetic display
-        final dataPoints = trend.isEmpty 
-          ? [
-              CrisisDataPoint(hour: 8, ticketCount: 2, avgSeverity: 0.2),
-              CrisisDataPoint(hour: 9, ticketCount: 5, avgSeverity: 0.35),
-              CrisisDataPoint(hour: 10, ticketCount: 12, avgSeverity: 0.6),
-              CrisisDataPoint(hour: 11, ticketCount: 8, avgSeverity: 0.4),
-            ] 
-          : trend;
-
-        return Card(
-          elevation: 3,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Crisis Volume & Severity Trend (Today)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  height: 220,
+        final dataPoints = provider.data.crisisTrend;
+        return GlassCard(
+          padding: const EdgeInsets.all(18.0),
+          borderRadius: 20,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.show_chart, color: Colors.blueAccent, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Crisis Volume & Severity Forecast',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1F1B2C)),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Live 24h',
+                      style: TextStyle(color: Color(0xFF059669), fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                height: 220,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 12, top: 12),
                   child: LineChart(
                     LineChartData(
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
                         getDrawingHorizontalLine: (value) => FlLine(
-                          color: const Color(0xFFE0E0E0),
+                          color: const Color(0xFFE2E8F0),
                           strokeWidth: 1,
-                          dashArray: [5, 5],
                         ),
                       ),
                       titlesData: FlTitlesData(
-                        // X-Axis (Time of Day)
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 28,
-                            interval: 1,
-                            getTitlesWidget: (value, meta) {
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 6.0),
-                                child: Text('${value.toInt().toString().padLeft(2, '0')}:00', 
-                                  style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B))),
-                              );
-                            },
-                          ),
-                        ),
-                        // Left Y-Axis (Ticket Count)
                         leftTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
-                            reservedSize: 28,
+                            reservedSize: 32,
                             getTitlesWidget: (value, meta) {
-                              return Text(value.toInt().toString(), 
+                              return Text('${value.toInt()}', 
                                 style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
                             },
                           ),
                         ),
-                        // Right Y-Axis (Crisis Severity scaled 0.0-1.0)
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 24,
+                            interval: 4,
+                            getTitlesWidget: (value, meta) {
+                              return Text('${value.toInt()}:00', 
+                                style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
+                            },
+                          ),
+                        ),
                         rightTitles: AxisTitles(
                           sideTitles: SideTitles(
                             showTitles: true,
@@ -809,7 +681,6 @@ class CrisisTrendChart extends StatelessWidget {
                         topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                       ),
                       borderData: FlBorderData(show: false),
-                      // Line 1: Ticket Volume (Left Axis Scale)
                       lineBarsData: [
                         LineChartBarData(
                           spots: dataPoints.map((dp) => FlSpot(dp.hour, dp.ticketCount.toDouble())).toList(),
@@ -830,7 +701,6 @@ class CrisisTrendChart extends StatelessWidget {
                             ),
                           ),
                         ),
-                        // Line 2: Avg Crisis Severity (Right Axis Scale)
                         LineChartBarData(
                           spots: dataPoints.map((dp) => FlSpot(dp.hour, dp.avgSeverity * 20)).toList(),
                           isCurved: true,
@@ -854,33 +724,33 @@ class CrisisTrendChart extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 14),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 14,
-                  runSpacing: 6,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.circle, color: Colors.blueAccent, size: 10),
-                        SizedBox(width: 4),
-                        Text('Incoming Tickets', style: TextStyle(fontSize: 11)),
-                      ],
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.horizontal_rule, color: Colors.deepOrange, size: 14),
-                        SizedBox(width: 4),
-                        Text('Avg Crisis Severity Index', style: TextStyle(fontSize: 11)),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 14,
+                runSpacing: 6,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.circle, color: Colors.blueAccent, size: 10),
+                      SizedBox(width: 4),
+                      Text('Incoming Tickets', style: TextStyle(fontSize: 11)),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.horizontal_rule, color: Colors.deepOrange, size: 14),
+                      SizedBox(width: 4),
+                      Text('Avg Crisis Severity Index', style: TextStyle(fontSize: 11)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ),
         );
       },
@@ -944,8 +814,8 @@ class AdminTelemetryDashboardScreen extends StatelessWidget {
                       if (isMobileHeader) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
+                          children: const [
+                            Text(
                               'Real-Time ML Telemetry & Budget Analytics',
                               style: TextStyle(
                                 fontSize: 20,
@@ -954,37 +824,23 @@ class AdminTelemetryDashboardScreen extends StatelessWidget {
                                 height: 1.2,
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: const [
-                                _StressTestButton(),
-                                _PdfExportButton(),
-                              ],
-                            ),
+                            SizedBox(height: 12),
+                            _PdfExportButton(),
                           ],
                         );
                       }
                       return Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          const Expanded(
+                        children: const [
+                          Expanded(
                             child: Text(
                               'Real-Time ML Telemetry & Budget Analytics',
                               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
                             ),
                           ),
-                          const SizedBox(width: 16),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: const [
-                              _StressTestButton(),
-                              _PdfExportButton(),
-                            ],
-                          ),
+                          SizedBox(width: 16),
+                          _PdfExportButton(),
                         ],
                       );
                     },
@@ -1000,10 +856,10 @@ class AdminTelemetryDashboardScreen extends StatelessWidget {
                             Expanded(
                               flex: 1,
                               child: Column(
-                                children: [
-                                  const BudgetUtilizationCard(),
-                                  const SizedBox(height: 20),
-                                  const MLModelHealthGrid(),
+                                children: const [
+                                  BudgetUtilizationCard(),
+                                  SizedBox(height: 20),
+                                  MLModelHealthGrid(),
                                 ],
                               ),
                             ),
@@ -1017,12 +873,12 @@ class AdminTelemetryDashboardScreen extends StatelessWidget {
                       } else {
                         // Mobile / Narrow layout
                         return Column(
-                          children: [
-                            const BudgetUtilizationCard(),
-                            const SizedBox(height: 20),
-                            const MLModelHealthGrid(),
-                            const SizedBox(height: 20),
-                            const CrisisTrendChart(),
+                          children: const [
+                            BudgetUtilizationCard(),
+                            SizedBox(height: 20),
+                            MLModelHealthGrid(),
+                            SizedBox(height: 20),
+                            CrisisTrendChart(),
                           ],
                         );
                       }
@@ -1092,32 +948,3 @@ class _PdfExportButtonState extends State<_PdfExportButton> {
     );
   }
 }
-
-class _StressTestButton extends StatelessWidget {
-  const _StressTestButton();
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: () {
-        showDialog(
-          context: context,
-          builder: (_) => const StressTestModal(),
-        );
-      },
-      icon: const Icon(Icons.flash_on, color: Colors.white, size: 18),
-      label: const Text(
-        '⚡ Run Crisis Stress-Test',
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-      ),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFFF59E0B),
-        foregroundColor: Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        elevation: 3,
-      ),
-    );
-  }
-}
-
