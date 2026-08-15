@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
 import '../models/user_profile.dart';
 import '../models/user_role.dart';
 import '../services/api_service.dart';
@@ -41,9 +43,38 @@ class AuthProvider extends ChangeNotifier {
         _user = UserProfile.fromJson(decoded);
         _syncApiConfig();
         notifyListeners();
+        // Asynchronously refresh live tenant metadata from backend
+        refreshProfile();
       }
     } catch (e) {
       debugPrint('Error loading saved auth session: $e');
+    }
+  }
+
+  /// Refresh user profile and tenant institution from backend
+  Future<void> refreshProfile() async {
+    if (_user == null && ApiConfig.userEmail == null && ApiConfig.userPhone == null) return;
+    try {
+      final email = _user?.email ?? ApiConfig.userEmail;
+      final phone = _user?.phone ?? ApiConfig.userPhone;
+      final queryParams = <String, String>{
+        if (email != null && email.isNotEmpty) 'email': email,
+        if (phone != null && phone.isNotEmpty) 'phone': phone,
+      };
+      final uri = Uri.parse('${ApiConfig.baseUrl}/auth/me').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final res = await http.get(uri, headers: ApiConfig.patientHeaders).timeout(const Duration(seconds: 5));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body) as Map<String, dynamic>;
+        if (data['success'] == true && data['user'] != null) {
+          final userData = Map<String, dynamic>.from(data['user']);
+          _user = UserProfile.fromJson(userData);
+          await _persistSession();
+          _syncApiConfig();
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing user profile: $e');
     }
   }
 

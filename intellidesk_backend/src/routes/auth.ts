@@ -652,13 +652,91 @@ router.post('/change-password', (req: Request, res: Response) => {
 
 /**
  * GET /api/v1/auth/me
+ * Returns current authenticated user profile with authentic tenant institution
  */
-router.get('/me', (req: Request, res: Response) => {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.includes('admin')) {
-    return res.status(200).json({ success: true, user: DEFAULT_ADMIN });
+router.get('/me', async (req: Request, res: Response) => {
+  try {
+    const authHeader = (req.headers.authorization || '').toLowerCase();
+    const email = (req.headers['x-user-email'] as string || req.query.email as string || '').trim().toLowerCase();
+    const phone = (req.headers['x-user-phone'] as string || req.query.phone as string || '').trim();
+    const instHeader = (req.headers['x-institution-id'] as string || req.query.institutionId as string || '').trim();
+    const lookupKey = email || phone;
+
+    // 1. If Patient lookup
+    if (lookupKey || authHeader.includes('patient') || authHeader.includes('student')) {
+      if (lookupKey) {
+        // Query Supabase patient_rosters
+        const { data: dbPatients } = await supabase
+          .from('patient_rosters')
+          .select('*')
+          .or(`email.ilike.${lookupKey},phone.eq.${lookupKey},patient_id.ilike.${lookupKey}`)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (dbPatients && dbPatients.length > 0) {
+          const p = dbPatients[0];
+          const pId = p.patient_id || p.id || lookupKey;
+          const userObj = {
+            id: `usr_pat_${pId}`,
+            name: p.email ? p.email.split('@')[0].replace(/[._-]/g, ' ').split(' ').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') : 'Registered Patient',
+            email: p.email || email,
+            phone: p.phone || phone,
+            studentId: pId,
+            patientId: pId,
+            role: 'PATIENT',
+            department: null,
+            institutionId: p.institution_id || instHeader || 'inst-001',
+            token: `jwt_token_patient_${p.institution_id || 'inst-001'}_${pId}`,
+          };
+          return res.status(200).json({ success: true, user: userObj });
+        }
+      }
+    }
+
+    // 2. Query Supabase profiles table
+    if (lookupKey) {
+      const { data: dbProfile } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`email.ilike.${lookupKey},phone.eq.${lookupKey}`)
+        .maybeSingle();
+
+      if (dbProfile) {
+        const isAdmin = dbProfile.role === 'CLINICAL_ADMIN' || dbProfile.role === 'ADMIN';
+        const userObj = {
+          id: dbProfile.id,
+          name: dbProfile.full_name || (isAdmin ? 'Clinical Administrator' : 'Registered Patient'),
+          email: dbProfile.email,
+          phone: dbProfile.phone || '',
+          studentId: isAdmin ? undefined : `PAT-${dbProfile.id.substring(0, 6).toUpperCase()}`,
+          patientId: isAdmin ? undefined : `PAT-${dbProfile.id.substring(0, 6).toUpperCase()}`,
+          role: isAdmin ? 'ADMIN' : 'PATIENT',
+          department: isAdmin ? (dbProfile.emergency_contact || 'Clinical Triage Desk') : null,
+          institutionId: dbProfile.institution_id || instHeader || 'inst-001',
+          token: `jwt_token_${isAdmin ? 'admin' : 'patient'}_${dbProfile.institution_id || 'inst-001'}_${dbProfile.id}`,
+        };
+        return res.status(200).json({ success: true, user: userObj });
+      }
+    }
+
+    // 3. Fallback
+    if (authHeader.includes('admin')) {
+      return res.status(200).json({ success: true, user: DEFAULT_ADMIN });
+    }
+
+    return res.status(200).json({
+      success: true,
+      user: {
+        id: 'usr_pat_001',
+        name: 'Patient Member',
+        email: email || 'patient@campushealth.edu',
+        role: 'PATIENT',
+        institutionId: instHeader || 'nano123',
+      },
+    });
+  } catch (err: any) {
+    return res.status(500).json({ success: false, error: err.message });
   }
-  return res.status(200).json({ success: true, user: USER_STORE.get('alex@university.edu') || DEFAULT_ADMIN });
 });
 
 export default router;
