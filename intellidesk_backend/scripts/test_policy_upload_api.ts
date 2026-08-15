@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const API_BASE = 'http://localhost:5000/api/v1';
+const API_BASE = 'http://localhost:3000/api/v1';
 
 async function testPolicyUpload() {
   console.log('🧪 Testing Policy Upload API with Category and Benefit Cap...\n');
@@ -27,6 +27,8 @@ async function testPolicyUpload() {
     method: 'POST',
     headers: {
       'x-institution-id': 'inst-001',
+      'x-user-role': 'ADMIN',
+      'Authorization': 'Bearer jwt_mock_token_admin_sarah_chen',
     },
     body: formData,
   });
@@ -43,6 +45,8 @@ async function testPolicyUpload() {
   const listRes = await fetch(`${API_BASE}/admin/knowledge/list`, {
     headers: {
       'x-institution-id': 'inst-001',
+      'x-user-role': 'ADMIN',
+      'Authorization': 'Bearer jwt_mock_token_admin_sarah_chen',
     },
   });
 

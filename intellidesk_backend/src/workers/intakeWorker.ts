@@ -61,6 +61,7 @@ export const intakeWorker = new Worker(
     const rawMessage = job.data.rawMessage || job.data.description || '';
     const patientPhone = job.data.patientPhone || job.data.studentPhone || '+15550000000';
     let mediaUrl = job.data.mediaUrl || job.data.media_url || job.data.attachmentUrl || job.data.receiptUrl;
+    const instId = job.data.institutionId || job.data.institution_id || 'inst-001';
     const jobId = job.id;
 
     console.log(`🩺 [Clinical Triage Worker] Starting processing for Job ${jobId} | Claim ${claimId}`);
@@ -206,7 +207,7 @@ export const intakeWorker = new Worker(
         const { data: matchedPolicyRows } = await supabase
           .from('policy_embeddings')
           .select('policy_name, max_coverage_limit, category')
-          .eq('institution_id', institutionId)
+          .eq('institution_id', instId)
           .or(`category.ilike.%${parsedCategory}%,policy_name.ilike.%${parsedCategory}%`)
           .order('max_coverage_limit', { ascending: false })
           .limit(1);
