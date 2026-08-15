@@ -195,6 +195,8 @@ asyncIntakeRouter.post('/web', checkBackpressure, tenantScopeMiddleware, upload.
       }
     } catch (_) {}
 
+    const patientVpa = req.body.payout_vpa || req.body.student_vpa || (patientContact ? `${patientContact.replace(/[^\d]/g, '')}@upi` : null);
+
     const job = await intakeQueue.add('process-web-intake', {
       claimId,
       ticketId,
@@ -207,6 +209,10 @@ asyncIntakeRouter.post('/web', checkBackpressure, tenantScopeMiddleware, upload.
       studentPhone: patientContact,
       patientPhone: patientContact,
       email: req.body.email || req.headers['x-user-email'] || '',
+      payoutVpa: patientVpa,
+      payout_vpa: patientVpa,
+      payoutMethod: req.body.payout_method || 'RAZORPAY_UPI',
+      payout_method: req.body.payout_method || 'RAZORPAY_UPI',
       institutionId,
       source: 'web'
     }, {

@@ -351,16 +351,63 @@ export const intakeWorker = new Worker(
         isLifeSafetyAlert ? `• 🚨 LIFE SAFETY OVERRIDE: ${lifeSafety.crisisHotlineText}` : null,
       ].filter(Boolean).join('\n');
 
+      const resolvedVpa = job.data.payoutVpa || job.data.payout_vpa || job.data.studentVpa || (patientPhone ? `${patientPhone.replace(/[^\d]/g, '')}@upi` : 'patient@upi');
+
       let claimStatus: ClaimStatus = isFlagged ? 'Flagged' : 'Triage Active';
       let approvedAmount = 0.00;
       let payoutReference: string = isFlagged ? 'FLAGGED_AUDIT_REQUIRED' : 'PENDING_APPROVAL';
       let payoutMethod: string = isFlagged ? 'HELD_FOR_ADMIN_AUDIT' : 'DIRECT_HEALTHCARE_FACILITY';
+      let allocatedFundName = 'Emergency Medical & Hospital Bill Relief Pool';
 
       if (!isFlagged && (esiLevel === 'ESI_1_CRITICAL' || esiLevel === 'ESI_2_EMERGENT')) {
         claimStatus = 'Approved';
         approvedAmount = finalCopay;
         payoutMethod = effectiveCurrency === 'INR' ? 'RAZORPAY_INSTANT' : 'DIRECT_ACH';
         payoutReference = `TXN_MED_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+        // Deduct from Institutional Relief Fund
+        try {
+          const { data: fundRows } = await supabase
+            .from('funds')
+            .select('id, fund_name, allocated_amount, total_budget')
+            .or(`fund_name.ilike.%Medical%,fund_name.ilike.%Emergency%`)
+            .limit(1);
+
+          if (fundRows && fundRows.length > 0) {
+            const fund = fundRows[0];
+            allocatedFundName = fund.fund_name;
+            await supabase
+              .from('funds')
+              .update({
+                allocated_amount: (Number(fund.allocated_amount) || 0) + approvedAmount,
+              })
+              .eq('id', fund.id);
+          }
+        } catch (fErr) {
+          console.warn('[IntakeWorker] Fund allocation update notice:', fErr);
+        }
+
+        // Post automated disbursement notification to patient
+        try {
+          const approvalNotice = [
+            `🎉 **Autonomous Emergency Copay Relieved & Disbursed**`,
+            `• 🧾 Verified Hospital Bill: ${effectiveCurrency} ${effectiveReceiptAmount || requestedAmount}`,
+            `• 💳 Disbursed Copay Amount: ${effectiveCurrency} ${approvedAmount.toFixed(2)}`,
+            `• 📋 Matched Policy: ${policyCapSource}`,
+            `• 🏛️ Institutional Fund: ${allocatedFundName}`,
+            `• ⚡ Instant Settlement Rail: ${payoutMethod} (Ref: ${payoutReference})`,
+            `• 📲 Recipient UPI / Account: ${resolvedVpa}`,
+          ].join('\n');
+
+          await supabase.from('claim_messages').insert([{
+            claim_id: claimId,
+            sender: 'COUNSELOR_AI',
+            message: approvalNotice,
+            is_crisis_response: false,
+          }]);
+        } catch (mErr) {
+          console.warn('[IntakeWorker] Auto-approval message notice:', mErr);
+        }
       }
 
       // 13. Update Database Write (claims primary table)
@@ -404,7 +451,7 @@ export const intakeWorker = new Worker(
       // Sync to tickets table for backward compatibility
       try {
         const ticketUpdatePayload: Record<string, any> = {
-          status: isFlagged ? 'Flagged' : (esiLevel === 'ESI_1_CRITICAL' ? 'Escalated' : 'Pending'),
+          status: isFlagged ? 'Flagged' : (claimStatus === 'Approved' ? 'Approved' : (esiLevel === 'ESI_1_CRITICAL' ? 'Escalated' : 'Pending')),
           urgency_level: formattedEsi,
           parsed_category: parsedCategory,
           crisis_severity_index: csiScore,
@@ -412,6 +459,8 @@ export const intakeWorker = new Worker(
           calculated_amount: finalCopay,
           currency: effectiveCurrency,
           thought_process: clinicalNotes,
+          payout_reference: payoutReference,
+          payout_method: payoutMethod,
           flag_reason: isFlagged ? fraudReport.flagReasons.join(' | ') : 'None',
           receipt_image_hash: fraudReport?.imageHash || null,
           fraud_risk_score: fraudReport?.riskScore || 0.0,

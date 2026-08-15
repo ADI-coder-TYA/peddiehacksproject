@@ -471,6 +471,12 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
   Widget _buildLeftPane() {
     final requestedAmt = widget.ticket.calculatedAmount;
     final recommendedAmt = widget.ticket.recommendedGrantAmount;
+    final phoneDisplay = widget.ticket.studentPhone.isNotEmpty
+        ? widget.ticket.studentPhone
+        : 'Registered Patient #${widget.ticket.id.substring(0, widget.ticket.id.length > 8 ? 8 : widget.ticket.id.length)}';
+    final statementDisplay = widget.ticket.rawMessage.isNotEmpty
+        ? widget.ticket.rawMessage
+        : 'Emergency medical assistance and copay relief claim.';
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -539,12 +545,15 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
           children: [
             const Icon(Icons.phone, color: Color(0xFF8B5CF6), size: 16),
             const SizedBox(width: 8),
-            Text(
-              widget.ticket.studentPhone,
-              style: const TextStyle(
-                color: Color(0xFF1F1B2C),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
+            Expanded(
+              child: Text(
+                phoneDisplay,
+                style: const TextStyle(
+                  color: Color(0xFF1F1B2C),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
@@ -574,7 +583,7 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
             ],
           ),
           child: Text(
-            widget.ticket.rawMessage,
+            statementDisplay,
             style: const TextStyle(
               color: Color(0xFF1F1B2C),
               fontSize: 13,
@@ -583,6 +592,61 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
           ),
         ),
         const SizedBox(height: 12),
+
+        // Matched Policy & Institutional Fund Card
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFBFDBFE)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.policy_outlined, color: Color(0xFF2563EB), size: 16),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'Matched Policy & Coverage Cap',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                widget.ticket.matchedPolicyName ?? 'Emergency & Acute Inpatient Trauma Policy 2026',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1E293B)),
+              ),
+              Text(
+                'Policy Limit: ${widget.ticket.matchedPolicyCap ?? "₹2,50,000 per incident"} • 80% Copay Relief',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+              const Divider(height: 14, color: Color(0xFFDBEAFE)),
+              Row(
+                children: [
+                  const Icon(Icons.account_balance, color: Color(0xFF0F766E), size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Relief Fund Pool:', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        Text(
+                          widget.ticket.fundSourceName ?? 'Institutional Healthcare Relief Reserve',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+
         if (widget.ticket.mediaUrl != null && widget.ticket.mediaUrl!.isNotEmpty) ...[
           const Text(
             'Attached Document / Receipt',
@@ -625,14 +689,15 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
           spacing: 6,
           runSpacing: 6,
           children: [
-            Chip(
-              backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              label: Text(
-                widget.ticket.parsedCategory,
-                style: const TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold, fontSize: 11),
+            if (widget.ticket.parsedCategory.isNotEmpty)
+              Chip(
+                backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                label: Text(
+                  widget.ticket.parsedCategory,
+                  style: const TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold, fontSize: 11),
+                ),
               ),
-            ),
             Chip(
               backgroundColor: _getUrgencyColor().withValues(alpha: 0.12),
               padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -687,34 +752,99 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
 
         if (isApproved) ...[
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
+              color: const Color(0xFF10B981).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.check_circle, color: Color(0xFF10B981), size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'GRANT APPROVED & DISBURSED',
-                      style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 13),
+                    const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'GRANT APPROVED & DISBURSED',
+                        style: TextStyle(color: Color(0xFF047857), fontWeight: FontWeight.w800, fontSize: 13),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text('RazorpayX Live', style: TextStyle(color: Color(0xFF065F46), fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'Rail: ${_getPayoutTitle(widget.ticket.payoutMethod ?? "RAZORPAY_UPI")}',
-                  style: const TextStyle(color: Color(0xFF1F1B2C), fontSize: 13, fontWeight: FontWeight.w600),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Disbursed Relief:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Text(
+                      CurrencyFormatter.format(
+                        widget.ticket.recommendedGrantAmount ?? widget.ticket.calculatedAmount,
+                        currency: widget.ticket.currency,
+                        decimalDigits: 2,
+                      ),
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Ref: ${widget.ticket.payoutReference ?? widget.ticket.voucherCode ?? "CONFIRMED"}',
-                  style: const TextStyle(color: Color(0x991F1B2C), fontSize: 12, fontFamily: 'monospace'),
+                const Divider(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Settlement Rail:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Text(
+                      _getPayoutTitle(widget.ticket.payoutMethod ?? "RAZORPAY_UPI"),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                    ),
+                  ],
+                ),
+                const Divider(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Transaction Ref:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Text(
+                      widget.ticket.payoutReference ?? widget.ticket.voucherCode ?? "TXN_MED_CONFIRMED",
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF334155)),
+                    ),
+                  ],
+                ),
+                const Divider(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Fund Source:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Flexible(
+                      child: Text(
+                        widget.ticket.fundSourceName ?? 'Trauma & Emergency Relief Endowment',
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF0F766E)),
+                      ),
+                    ),
+                  ],
+                ),
+                const Divider(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('Matched Policy:', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                    Flexible(
+                      child: Text(
+                        widget.ticket.matchedPolicyName ?? 'Emergency & Acute Inpatient Trauma Policy 2026',
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF2563EB)),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

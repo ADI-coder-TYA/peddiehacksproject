@@ -19,11 +19,38 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _descController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _payoutController = TextEditingController();
 
   String _selectedCategory = 'Medical Emergency & Inpatient Care';
   PlatformFile? _pickedFile;
   bool _isSubmitting = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      final userPhone = auth.user?.phone ?? ApiConfig.userPhone ?? '';
+      if (userPhone.isNotEmpty) {
+        final cleanPhone = userPhone.replaceAll(RegExp(r'[^0-9]'), '');
+        if (_phoneController.text.isEmpty) {
+          _phoneController.text = userPhone;
+        }
+        if (_payoutController.text.isEmpty && cleanPhone.isNotEmpty) {
+          _payoutController.text = '$cleanPhone@upi';
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _descController.dispose();
+    _phoneController.dispose();
+    _payoutController.dispose();
+    super.dispose();
+  }
 
   final List<String> _clinicalCategories = [
     'Medical Emergency & Inpatient Care',
@@ -48,9 +75,11 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error selecting document: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting document: $e')),
+        );
+      }
     }
   }
 
@@ -68,6 +97,9 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
           ? _phoneController.text.trim()
           : (auth.user?.phone ?? ApiConfig.userPhone ?? '');
       final instId = auth.user?.institutionId ?? ApiConfig.activeInstitutionId;
+      final payoutVpa = _payoutController.text.trim().isNotEmpty
+          ? _payoutController.text.trim()
+          : '${patientPhone.replaceAll(RegExp(r"[^0-9]"), "")}@upi';
 
       String? mediaUrl;
       if (_pickedFile != null && _pickedFile!.bytes != null) {
@@ -91,6 +123,9 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
         'institutionId': instId,
         'institution_id': instId,
         'media_url': mediaUrl,
+        'payout_vpa': payoutVpa,
+        'payout_method': 'RAZORPAY_UPI',
+        'student_vpa': payoutVpa,
         'source': 'flutter-patient-portal',
       };
 
@@ -157,7 +192,7 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
                 decoration: BoxDecoration(
                   color: AppTheme.primaryContainer,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppTheme.primaryBrand.withOpacity(0.3)),
+                  border: Border.all(color: AppTheme.primaryBrand.withValues(alpha: 0.3)),
                 ),
                 child: const Row(
                   children: [
@@ -195,7 +230,7 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
               ),
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: InputDecoration(
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -219,9 +254,30 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
                 decoration: InputDecoration(
-                  hintText: '+91 98765 43210 or (555) 019-2834',
+                  hintText: '+91 88268 10145 or (555) 019-2834',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   prefixIcon: const Icon(Icons.phone, size: 18),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Instant Copay Disbursement Account
+              const Text(
+                'Instant Copay Payout Account (UPI ID / VPA or Bank IMPS)',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Approved emergency funds will be instantly disbursed to this account via RazorpayX multi-rail settlement.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+              ),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _payoutController,
+                decoration: InputDecoration(
+                  hintText: 'e.g. 8826810145@upi or student@okhdfcbank',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  prefixIcon: const Icon(Icons.account_balance_wallet_outlined, size: 18),
                 ),
               ),
               const SizedBox(height: 20),
