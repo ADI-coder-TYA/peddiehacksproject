@@ -33,7 +33,17 @@ const upload = multer({
     files: 1,
   },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
+    const name = file.originalname?.toLowerCase() || '';
+    const mime = file.mimetype?.toLowerCase() || '';
+    const isPdf =
+      mime === 'application/pdf' ||
+      mime === 'application/x-pdf' ||
+      mime === 'application/octet-stream' ||
+      mime === 'binary/octet-stream' ||
+      mime.includes('pdf') ||
+      name.endsWith('.pdf');
+
+    if (isPdf) {
       cb(null, true);
     } else {
       cb(new Error('Only PDF files are accepted.'));
@@ -63,10 +73,10 @@ function chunkText(text: string): string[] {
   const normalised = text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
-    .replace(/\n{3,}/g, '\n\n')  // collapse triple+ newlines
+    .replace(/[ \t]+/g, ' ')
     .trim();
 
-  const paragraphs = normalised.split(/\n\n+/);
+  const paragraphs = normalised.split(/\n{2,}/);
   const rawChunks: string[] = [];
   let buffer = '';
 
@@ -162,33 +172,46 @@ const knowledgeRouter = Router();
 
 knowledgeRouter.post(
   '/upload',
-  upload.single('pdf'),
+  (req: Request, res: Response, next: any) => {
+    upload.single('pdf')(req, res, (err: any) => {
+      if (err) {
+        console.warn('⚠️ [KB] Upload middleware notice:', err.message);
+        return res.status(400).json({ success: false, error: err.message || 'Only PDF files are accepted.' });
+      }
+      next();
+    });
+  },
   async (req: Request, res: Response) => {
     if (!req.file) {
-      res.status(400).json({ error: 'No PDF file uploaded. Field name must be "pdf".' });
+      res.status(400).json({ success: false, error: 'No PDF file uploaded. Field name must be "pdf".' });
       return;
     }
 
     const originalName = req.file.originalname;
-    const documentName = (req.body.documentName as string | undefined)?.trim()
+    const documentName = (req.body.documentName || req.body.policyName || req.body.title as string | undefined)?.trim()
       || originalName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
+    const category = (req.body.category || req.body.clinicalCategory as string | undefined)?.trim()
+      || 'Medical Emergency & Inpatient Care';
+    const maxCoverageLimit = Number(req.body.maxCoverageLimit || req.body.max_coverage_limit || req.body.coverageLimit || 50000.0);
+    const currency = (req.body.currency as string | undefined)?.trim() || 'INR';
 
-    console.log(`[KB] Upload received: "${originalName}" (${req.file.size} bytes)`);
+    console.log(`[KB] Upload received: "${originalName}" (${req.file.size} bytes) | Category: ${category} | Limit: ₹${maxCoverageLimit}`);
 
     // ── Step 1: Parse PDF ──────────────────────────────────
     let extractedText: string;
     try {
       extractedText = await extractTextFromPdf(req.file.buffer);
-      if (!extractedText || extractedText.trim().length < 50) {
+      if (!extractedText || extractedText.trim().length < 30) {
         res.status(422).json({
+          success: false,
           error: 'PDF appears to be empty or image-only (no extractable text).',
         });
         return;
       }
-      console.log(`[KB] Extracted ${extractedText.length} characters from PDF via pdftotext -layout.`);
+      console.log(`[KB] Extracted ${extractedText.length} characters from PDF.`);
     } catch (err: any) {
       console.error('[KB] PDF parsing error:', err);
-      res.status(422).json({ error: 'Failed to parse PDF. Ensure the file is a valid, text-based PDF.' });
+      res.status(422).json({ success: false, error: 'Failed to parse PDF. Ensure the file is a valid, text-based PDF.' });
       return;
     }
 
@@ -197,13 +220,24 @@ knowledgeRouter.post(
     console.log(`[KB] Split into ${chunks.length} chunks.`);
 
     if (chunks.length === 0) {
-      res.status(422).json({ error: 'No text chunks could be extracted from this document.' });
+      res.status(422).json({ success: false, error: 'No text chunks could be extracted from this document.' });
       return;
     }
 
     // ── Step 3 & 4: Embed each chunk + Upsert to Supabase ──
     const documentId = uuidv4();
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : 'inst-001');
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || 'inst-001')) as string;
+
+    // Ensure parent institution exists in Supabase to guarantee foreign key integrity
+    try {
+      await supabase.from('institutions').upsert({
+        id: instId,
+        name: instId === 'inst-001' ? 'Apex Health & Medical Center' : instId,
+        domain: 'campushealth.edu',
+        default_currency: currency,
+      });
+    } catch (_) {}
+
     const insertedRows: Array<{
       id: string;
       institution_id: string;
@@ -225,11 +259,11 @@ knowledgeRouter.post(
         insertedRows.push({
           id: uuidv4(),
           institution_id: instId,
-          category: 'General Clinical & Welfare Guidelines',
+          category: category,
           policy_name: documentName,
           policy_chunk: batch[j],
-          max_coverage_limit: 50000.00,
-          currency: 'INR',
+          max_coverage_limit: maxCoverageLimit,
+          currency: currency,
           embedding: embeddings[j]?.slice(0, 384),
         });
       }
@@ -243,7 +277,7 @@ knowledgeRouter.post(
 
     if (insertError) {
       console.error('[KB] Supabase insert error:', insertError);
-      res.status(500).json({ error: `Database error: ${insertError.message}` });
+      res.status(500).json({ success: false, error: `Database error: ${insertError.message}` });
       return;
     }
 
@@ -253,9 +287,11 @@ knowledgeRouter.post(
       success: true,
       documentId,
       documentName,
+      category,
+      maxCoverageLimit,
       fileName: originalName,
       chunkCount: insertedRows.length,
-      message: `"${documentName}" processed and embedded into the knowledge base.`,
+      message: `"${documentName}" processed into ${insertedRows.length} chunks and embedded into the knowledge base.`,
     });
   }
 );
@@ -265,7 +301,7 @@ knowledgeRouter.post(
 
 knowledgeRouter.get('/list', async (req: Request, res: Response) => {
   try {
-    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (req.headers['x-institution-id'] as string) || 'inst-001');
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || 'inst-001')) as string;
 
     const { data, error } = await supabase
       .from('policy_embeddings')
