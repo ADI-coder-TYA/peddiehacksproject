@@ -24,6 +24,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   bool _isSubmitting = false;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AuthProvider>().refreshProfile();
+    });
+  }
+
+  @override
   void dispose() {
     _oldPassCtrl.dispose();
     _newPassCtrl.dispose();

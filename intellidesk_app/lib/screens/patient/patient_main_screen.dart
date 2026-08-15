@@ -230,7 +230,9 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
                           children: [
                             Flexible(
                               child: Text(
-                                user?.name ?? 'Alex Rivera',
+                                (user?.name != null && user!.name.isNotEmpty)
+                                    ? user.name
+                                    : (user?.email != null ? user!.email.split('@')[0] : 'Patient Member'),
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.outfit(
                                   color: const Color(0xFF0F172A),

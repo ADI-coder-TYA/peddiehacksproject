@@ -66,7 +66,8 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
       final auth = context.read<AuthProvider>();
       final patientPhone = _phoneController.text.trim().isNotEmpty
           ? _phoneController.text.trim()
-          : (auth.user?.phone ?? '9876543210');
+          : (auth.user?.phone ?? ApiConfig.userPhone ?? '');
+      final instId = auth.user?.institutionId ?? ApiConfig.activeInstitutionId;
 
       String? mediaUrl;
       if (_pickedFile != null && _pickedFile!.bytes != null) {
@@ -78,24 +79,26 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
       final payload = {
         'studentPhone': patientPhone,
         'patientPhone': patientPhone,
+        'email': auth.user?.email ?? ApiConfig.userEmail,
         'description': _descController.text.trim(),
         'message': _descController.text.trim(),
         'clinicalCategory': _selectedCategory,
         'category': _selectedCategory,
-        'institutionId': 'default',
+        'institutionId': instId,
+        'institution_id': instId,
         'media_url': mediaUrl,
         'source': 'flutter-patient-portal',
       };
 
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/intake/web'),
-        headers: {'Content-Type': 'application/json'},
+        headers: ApiConfig.patientHeaders,
         body: jsonEncode(payload),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final resData = jsonDecode(response.body);
-        final claimId = resData['ticketId'] ?? resData['claimId'] ?? 'CLM-${DateTime.now().millisecondsSinceEpoch}';
+        final claimId = resData['ticketId'] ?? resData['claimId'] ?? resData['id'];
 
         if (mounted) {
           Navigator.pushReplacement(
@@ -111,15 +114,10 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
         });
       }
     } catch (e) {
-      // In offline/demo mode, proceed to status screen with generated ID
-      final demoClaimId = 'CLM-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
       if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (_) => ClaimStatusScreen(claimId: demoClaimId),
-          ),
-        );
+        setState(() {
+          _errorMessage = 'Connection error submitting claim: $e';
+        });
       }
     } finally {
       if (mounted) {

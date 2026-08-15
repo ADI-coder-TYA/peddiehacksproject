@@ -24,12 +24,46 @@ class _ClinicalChatScreenState extends State<ClinicalChatScreen> {
   @override
   void initState() {
     super.initState();
-    // Welcome message from Counselor AI
-    _messages.add({
-      'sender': 'COUNSELOR_AI',
-      'message': 'Hello. I am the MedAccess AI Clinical & Psychological First Aid Assistant. How are you feeling right now? Please share what medical support or distress you are experiencing.',
-      'timestamp': DateTime.now().toIso8601String(),
-    });
+    _fetchHistory();
+  }
+
+  Future<void> _fetchHistory() async {
+    final claimId = widget.claimId ?? 'general';
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/chat/claims/$claimId/messages'),
+        headers: ApiConfig.patientHeaders,
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty && mounted) {
+          setState(() {
+            _messages.clear();
+            for (final m in data) {
+              _messages.add({
+                'sender': m['sender'] ?? 'COUNSELOR_AI',
+                'message': m['message'] ?? '',
+                'isCrisis': m['is_crisis_response'] == true,
+                'timestamp': m['created_at'] ?? DateTime.now().toIso8601String(),
+              });
+            }
+          });
+          _scrollToBottom();
+          return;
+        }
+      }
+    } catch (_) {}
+
+    if (_messages.isEmpty && mounted) {
+      setState(() {
+        _messages.add({
+          'sender': 'COUNSELOR_AI',
+          'message': 'Hello. I am the MedAccess AI Clinical & Psychological First Aid Assistant. How are you feeling right now? Please share what medical support or distress you are experiencing.',
+          'timestamp': DateTime.now().toIso8601String(),
+        });
+      });
+    }
   }
 
   Future<void> _launchCall(String url) async {
@@ -61,10 +95,12 @@ class _ClinicalChatScreenState extends State<ClinicalChatScreen> {
       final claimId = widget.claimId ?? 'general';
       final response = await http.post(
         Uri.parse('${ApiConfig.baseUrl}/chat/claims/$claimId/messages'),
-        headers: {'Content-Type': 'application/json'},
+        headers: ApiConfig.patientHeaders,
         body: jsonEncode({
           'message': text,
-          'patientPhone': 'web-client',
+          'patientPhone': ApiConfig.userPhone ?? '',
+          'email': ApiConfig.userEmail ?? '',
+          'institutionId': ApiConfig.activeInstitutionId,
         }),
       );
 
