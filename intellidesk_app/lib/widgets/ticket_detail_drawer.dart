@@ -748,89 +748,152 @@ class TicketDetailDrawer extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  BoutiqueButton(
-                    onPressed: () {
-                      context.read<TicketProvider>().approveTicket(ticket.id);
-                      Navigator.of(context).pop();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                  if (ticket.status == 'Approved' || ticket.status == 'Resolved') ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      margin: const EdgeInsets.only(bottom: 12),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF1F1B2C), Color(0xFF3B3355)],
-                        ),
-                        borderRadius: BorderRadius.circular(30),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF1F1B2C).withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
+                        color: const Color(0xFFECFDF5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.4)),
                       ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.check_circle, color: Colors.white, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Confirm AI Decision & Release Copay',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  BoutiqueButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      showDialog(
-                        context: context,
-                        builder: (ctx) => ApprovalDeskDialog(ticket: ticket),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: const Color(0xFF1F1B2C), width: 1.5),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.edit_note, color: Color(0xFF1F1B2C), size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'Override & Custom Approve',
-                            style: TextStyle(color: Color(0xFF1F1B2C), fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  BoutiqueButton(
-                    onPressed: () {
-                      context.read<TicketProvider>().denyTicket(ticket.id, notes: 'Escalated to Clinical Medical Board');
-                      Navigator.of(context).pop();
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.arrow_upward, color: Color(0xFFEE4D9F), size: 18),
-                          SizedBox(width: 6),
-                          Text(
-                            'Escalate to Clinical Board',
-                            style: TextStyle(color: Color(0xFFEE4D9F), fontWeight: FontWeight.bold, fontSize: 14),
+                          const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Copay Relief Disbursed: ${CurrencyFormatter.format(ticket.recommendedGrantAmount ?? ticket.calculatedAmount, currency: ticket.currency)}',
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF065F46), fontSize: 13),
+                            ),
                           ),
                         ],
                       ),
                     ),
-                  ),
+                    BoutiqueButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => ApprovalDeskDialog(ticket: ticket),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF0F766E), Color(0xFF0D9488)],
+                          ),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF0F766E).withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.receipt_long, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'View Live Disbursement Receipt & Audit',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else ...[
+                    BoutiqueButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => ApprovalDeskDialog(ticket: ticket),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF1F1B2C), Color(0xFF3B3355)],
+                          ),
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF1F1B2C).withValues(alpha: 0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle, color: Colors.white, size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Confirm AI Decision & Open Payment Desk',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    BoutiqueButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        showDialog(
+                          context: context,
+                          builder: (ctx) => ApprovalDeskDialog(ticket: ticket),
+                        );
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          border: Border.all(color: const Color(0xFF1F1B2C), width: 1.5),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.edit_note, color: Color(0xFF1F1B2C), size: 20),
+                            SizedBox(width: 8),
+                            Text(
+                              'Override & Custom Approve',
+                              style: TextStyle(color: Color(0xFF1F1B2C), fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    BoutiqueButton(
+                      onPressed: () {
+                        context.read<TicketProvider>().denyTicket(ticket.id, notes: 'Escalated to Clinical Medical Board');
+                        Navigator.of(context).pop();
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.arrow_upward, color: Color(0xFFEE4D9F), size: 18),
+                            SizedBox(width: 6),
+                            Text(
+                              'Escalate to Clinical Board',
+                              style: TextStyle(color: Color(0xFFEE4D9F), fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

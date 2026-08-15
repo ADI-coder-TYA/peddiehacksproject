@@ -113,6 +113,7 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
 
       widget.onDisbursed?.call(_selectedPayoutMethod, parsedAmount, transactionRef.toString());
 
+      final formattedAmt = CurrencyFormatter.format(parsedAmount, currency: widget.ticket.currency);
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Row(
@@ -120,7 +121,7 @@ class _ApprovalDeskDialogState extends State<ApprovalDeskDialog> {
               const Icon(Icons.check_circle, color: Colors.white, size: 20),
               const SizedBox(width: 10),
               Expanded(
-                child: Text('Disbursed \$$parsedAmount via ${_getPayoutTitle(_selectedPayoutMethod)}! Ref: $transactionRef'),
+                child: Text('Disbursed $formattedAmt via ${_getPayoutTitle(_selectedPayoutMethod)}! Ref: $transactionRef'),
               ),
             ],
           ),
