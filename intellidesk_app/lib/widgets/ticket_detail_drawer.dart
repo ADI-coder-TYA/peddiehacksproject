@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/ticket.dart';
 import '../providers/ticket_provider.dart';
 import '../utils/currency_formatter.dart';
@@ -14,12 +15,6 @@ class TicketDetailDrawer extends StatelessWidget {
     super.key,
     required this.ticket,
   });
-
-  Color _getCrisisColor(double severity) {
-    if (severity > 0.75) return const Color(0xFFEE4D9F);
-    if (severity > 0.45) return const Color(0xFFF59E0B);
-    return const Color(0xFF10B981);
-  }
 
   Widget _buildMilestoneRow({
     required IconData icon,
@@ -230,6 +225,7 @@ class TicketDetailDrawer extends StatelessWidget {
                           InkWell(
                             borderRadius: BorderRadius.circular(10),
                             onTap: () {
+                              final uri = Uri.tryParse(ticket.mediaUrl!);
                               showDialog(
                                 context: context,
                                 builder: (ctx) => AlertDialog(
@@ -245,25 +241,49 @@ class TicketDetailDrawer extends StatelessWidget {
                                     mainAxisSize: MainAxisSize.min,
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('URL: ${ticket.mediaUrl}', style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
-                                      const SizedBox(height: 12),
+                                      Text(
+                                        'Verified Hospital Invoice & Laboratory Receipt',
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+                                      ),
+                                      const SizedBox(height: 10),
                                       Container(
                                         padding: const EdgeInsets.all(12),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF1F5F9),
                                           borderRadius: BorderRadius.circular(12),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
                                         ),
-                                        child: const Row(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Icon(Icons.verified, color: Color(0xFF10B981), size: 16),
-                                            SizedBox(width: 8),
-                                            Text('OCR Bill Hash Verified Clean', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+                                            const Row(
+                                              children: [
+                                                Icon(Icons.verified, color: Color(0xFF10B981), size: 16),
+                                                SizedBox(width: 8),
+                                                Text('OCR Bill Hash Verified Clean', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F766E))),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              'Extracted Amount: ${CurrencyFormatter.format(ticket.calculatedAmount, currency: ticket.currency)}',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                            ),
                                           ],
                                         ),
                                       ),
                                     ],
                                   ),
                                   actions: [
+                                    if (uri != null)
+                                      ElevatedButton.icon(
+                                        onPressed: () => launchUrl(uri, mode: LaunchMode.externalApplication),
+                                        icon: const Icon(Icons.open_in_new, size: 16),
+                                        label: const Text('Open PDF Invoice'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF6366F1),
+                                          foregroundColor: Colors.white,
+                                        ),
+                                      ),
                                     TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Close')),
                                   ],
                                 ),
@@ -278,10 +298,10 @@ class TicketDetailDrawer extends StatelessWidget {
                               child: const Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.attach_file, size: 15, color: Color(0xFF4F46E5)),
+                                  Icon(Icons.picture_as_pdf, size: 15, color: Color(0xFF4F46E5)),
                                   SizedBox(width: 6),
                                   Text(
-                                    'View Verified Medical Invoice Receipt',
+                                    'View Hospital Bill / PDF Receipt',
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
