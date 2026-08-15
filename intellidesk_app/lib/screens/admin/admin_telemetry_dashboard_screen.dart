@@ -73,26 +73,26 @@ class TelemetryData {
 
     var trendList = data['crisis_trend'] ?? data['crisisTrend'] ?? json['crisis_trend'];
     List<dynamic> trendArray = [];
-    if (trendList is List) {
+    if (trendList is List && trendList.isNotEmpty) {
       trendArray = trendList;
     } else {
       trendArray = [
-        {'hour': 0.0, 'ticket_count': 2, 'avg_severity': 0.7},
-        {'hour': 4.0, 'ticket_count': 5, 'avg_severity': 0.85},
-        {'hour': 8.0, 'ticket_count': 12, 'avg_severity': 0.6},
-        {'hour': 12.0, 'ticket_count': 18, 'avg_severity': 0.5},
-        {'hour': 16.0, 'ticket_count': 14, 'avg_severity': 0.65},
-        {'hour': 20.0, 'ticket_count': 8, 'avg_severity': 0.75},
+        {'hour': 0.0, 'ticket_count': 0, 'avg_severity': 0.0},
+        {'hour': 4.0, 'ticket_count': 0, 'avg_severity': 0.0},
+        {'hour': 8.0, 'ticket_count': 0, 'avg_severity': 0.0},
+        {'hour': 12.0, 'ticket_count': 0, 'avg_severity': 0.0},
+        {'hour': 16.0, 'ticket_count': 0, 'avg_severity': 0.0},
+        {'hour': 20.0, 'ticket_count': 0, 'avg_severity': 0.0},
       ];
     }
 
-    final double faRemaining = (data['financial_aid_remaining'] ?? budget['financialAidRemaining'] ?? budget['remainingFunds'] ?? 50000.0) is num
-        ? ((data['financial_aid_remaining'] ?? budget['financialAidRemaining'] ?? budget['remainingFunds'] ?? 50000.0) as num).toDouble()
-        : 50000.0;
+    final double faRemaining = (data['financial_aid_remaining'] ?? budget['financialAidRemaining'] ?? budget['remainingFunds'] ?? 0.0) is num
+        ? ((data['financial_aid_remaining'] ?? budget['financialAidRemaining'] ?? budget['remainingFunds'] ?? 0.0) as num).toDouble()
+        : 0.0;
         
-    final double afRemaining = (data['alumni_fund_remaining'] ?? budget['alumniFundRemaining'] ?? 25000.0) is num
-        ? ((data['alumni_fund_remaining'] ?? budget['alumniFundRemaining'] ?? 25000.0) as num).toDouble()
-        : 25000.0;
+    final double afRemaining = (data['alumni_fund_remaining'] ?? budget['alumniFundRemaining'] ?? 0.0) is num
+        ? ((data['alumni_fund_remaining'] ?? budget['alumniFundRemaining'] ?? 0.0) as num).toDouble()
+        : 0.0;
 
     final double faDisbursed = (data['financial_aid_disbursed'] ?? budget['totalDisbursed'] ?? 0.0) is num
         ? ((data['financial_aid_disbursed'] ?? budget['totalDisbursed'] ?? 0.0) as num).toDouble()
@@ -103,21 +103,21 @@ class TelemetryData {
         : 0.0;
 
     final num? rawHours = performance['averageResolutionTimeHours'] as num?;
-    final double avgResMin = (data['avg_resolution_time_min'] ?? (rawHours != null ? rawHours * 60 : null) ?? 14.5) is num
-        ? ((data['avg_resolution_time_min'] ?? (rawHours != null ? rawHours * 60 : null) ?? 14.5) as num).toDouble()
-        : 14.5;
+    final double avgResMin = (data['avg_resolution_time_min'] ?? (rawHours != null ? rawHours * 60 : null) ?? 0.0) is num
+        ? ((data['avg_resolution_time_min'] ?? (rawHours != null ? rawHours * 60 : null) ?? 0.0) as num).toDouble()
+        : 0.0;
 
     return TelemetryData(
       avgResolutionTimeMin: avgResMin,
-      autoApprovalAccuracy: (data['auto_approval_accuracy'] as num?)?.toDouble() ?? 0.88,
+      autoApprovalAccuracy: (data['auto_approval_accuracy'] as num?)?.toDouble() ?? 0.0,
       fraudSpikeCount: (data['fraud_spike_count'] as num?)?.toInt() ?? 0,
-      avgCrisisSeverity: (data['avg_crisis_severity'] as num?)?.toDouble() ?? 0.65,
+      avgCrisisSeverity: (data['avg_crisis_severity'] as num?)?.toDouble() ?? 0.0,
       financialAidRemaining: faRemaining,
       alumniFundRemaining: afRemaining,
       financialAidDisbursed: faDisbursed,
       alumniFundDisbursed: afDisbursed,
-      estimatedDaysFinancialAid: (data['estimated_days_financial_aid'] as num?)?.toInt() ?? 45,
-      estimatedDaysAlumniFund: (data['estimated_days_alumni_fund'] as num?)?.toInt() ?? 60,
+      estimatedDaysFinancialAid: (data['estimated_days_financial_aid'] as num?)?.toInt() ?? 0,
+      estimatedDaysAlumniFund: (data['estimated_days_alumni_fund'] as num?)?.toInt() ?? 0,
       crisisTrend: trendArray.map((e) => CrisisDataPoint.fromJson(Map<String, dynamic>.from(e as Map))).toList(),
     );
   }
@@ -592,6 +592,8 @@ class CrisisTrendChart extends StatelessWidget {
     return Consumer<TelemetryProvider>(
       builder: (context, provider, _) {
         final dataPoints = provider.data.crisisTrend;
+        final totalEvents = dataPoints.fold<int>(0, (sum, dp) => sum + dp.ticketCount);
+
         return GlassCard(
           padding: const EdgeInsets.all(18.0),
           borderRadius: 20,
@@ -638,124 +640,163 @@ class CrisisTrendChart extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 20),
-              SizedBox(
-                height: 220,
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 12, top: 12),
-                  child: LineChart(
-                    LineChartData(
-                      gridData: FlGridData(
-                        show: true,
-                        drawVerticalLine: false,
-                        getDrawingHorizontalLine: (value) => FlLine(
-                          color: const Color(0xFFE2E8F0),
-                          strokeWidth: 1,
+              if (totalEvents == 0)
+                Container(
+                  height: 200,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFCCFBF1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.show_chart_rounded, color: Color(0xFF0D9488), size: 26),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'No Incident Claims in Last 24 Hours',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                      ),
+                      const SizedBox(height: 4),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          'Database pristine. As patients submit emergency claims, 24h volume & severity curves plot dynamically in real time.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
                         ),
                       ),
-                      titlesData: FlTitlesData(
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 32,
-                            getTitlesWidget: (value, meta) {
-                              return Text('${value.toInt()}', 
-                                style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
-                            },
+                    ],
+                  ),
+                )
+              else ...[
+                SizedBox(
+                  height: 220,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 12, top: 12),
+                    child: LineChart(
+                      LineChartData(
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (value) => FlLine(
+                            color: const Color(0xFFE2E8F0),
+                            strokeWidth: 1,
                           ),
                         ),
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 24,
-                            interval: 4,
-                            getTitlesWidget: (value, meta) {
-                              return Text('${value.toInt()}:00', 
-                                style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
-                            },
+                        titlesData: FlTitlesData(
+                          leftTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 32,
+                              getTitlesWidget: (value, meta) {
+                                return Text('${value.toInt()}', 
+                                  style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
+                              },
+                            ),
                           ),
-                        ),
-                        rightTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            reservedSize: 28,
-                            getTitlesWidget: (value, meta) {
-                              return Text(value.toStringAsFixed(1), 
-                                style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
-                            },
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 24,
+                              interval: 4,
+                              getTitlesWidget: (value, meta) {
+                                return Text('${value.toInt()}:00', 
+                                  style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
+                              },
+                            ),
                           ),
+                          rightTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 28,
+                              getTitlesWidget: (value, meta) {
+                                return Text(value.toStringAsFixed(1), 
+                                  style: const TextStyle(fontSize: 10, color: Color(0xFF6E6B7B)));
+                              },
+                            ),
+                          ),
+                          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                         ),
-                        topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        borderData: FlBorderData(show: false),
+                        lineBarsData: [
+                          LineChartBarData(
+                            spots: dataPoints.map((dp) => FlSpot(dp.hour, dp.ticketCount.toDouble())).toList(),
+                            isCurved: true,
+                            color: Colors.blueAccent,
+                            barWidth: 3,
+                            isStrokeCapRound: true,
+                            dotData: const FlDotData(show: true),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.blueAccent.withValues(alpha: 0.3),
+                                  Colors.blueAccent.withValues(alpha: 0.0),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                          LineChartBarData(
+                            spots: dataPoints.map((dp) => FlSpot(dp.hour, dp.avgSeverity * 20)).toList(),
+                            isCurved: true,
+                            color: Colors.deepOrange,
+                            barWidth: 3,
+                            isStrokeCapRound: true,
+                            dotData: const FlDotData(show: false),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.deepOrange.withValues(alpha: 0.2),
+                                  Colors.deepOrange.withValues(alpha: 0.0),
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      borderData: FlBorderData(show: false),
-                      lineBarsData: [
-                        LineChartBarData(
-                          spots: dataPoints.map((dp) => FlSpot(dp.hour, dp.ticketCount.toDouble())).toList(),
-                          isCurved: true,
-                          color: Colors.blueAccent,
-                          barWidth: 3,
-                          isStrokeCapRound: true,
-                          dotData: const FlDotData(show: true),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.blueAccent.withValues(alpha: 0.3),
-                                Colors.blueAccent.withValues(alpha: 0.0),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ),
-                        LineChartBarData(
-                          spots: dataPoints.map((dp) => FlSpot(dp.hour, dp.avgSeverity * 20)).toList(),
-                          isCurved: true,
-                          color: Colors.deepOrange,
-                          barWidth: 3,
-                          isStrokeCapRound: true,
-                          dotData: const FlDotData(show: false),
-                          belowBarData: BarAreaData(
-                            show: true,
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.deepOrange.withValues(alpha: 0.2),
-                                Colors.deepOrange.withValues(alpha: 0.0),
-                              ],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ),
-                      ],
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 14),
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 14,
-                runSpacing: 6,
-                children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.circle, color: Colors.blueAccent, size: 10),
-                      SizedBox(width: 4),
-                      Text('Incoming Tickets', style: TextStyle(fontSize: 11)),
-                    ],
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.horizontal_rule, color: Colors.deepOrange, size: 14),
-                      SizedBox(width: 4),
-                      Text('Avg Crisis Severity Index', style: TextStyle(fontSize: 11)),
-                    ],
-                  ),
-                ],
-              ),
+                const SizedBox(height: 14),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 14,
+                  runSpacing: 6,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.circle, color: Colors.blueAccent, size: 10),
+                        SizedBox(width: 4),
+                        Text('Incoming Tickets', style: TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.horizontal_rule, color: Colors.deepOrange, size: 14),
+                        SizedBox(width: 4),
+                        Text('Avg Crisis Severity Index', style: TextStyle(fontSize: 11)),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         );
