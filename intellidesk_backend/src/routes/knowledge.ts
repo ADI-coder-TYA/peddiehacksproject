@@ -192,7 +192,10 @@ knowledgeRouter.post(
       || originalName.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ');
     const category = (req.body.category || req.body.clinicalCategory as string | undefined)?.trim()
       || 'Medical Emergency & Inpatient Care';
-    const maxCoverageLimit = Number(req.body.maxCoverageLimit || req.body.max_coverage_limit || req.body.coverageLimit || 50000.0);
+    const rawLimit = req.body.maxCoverageLimit || req.body.max_coverage_limit || req.body.coverageLimit;
+    const maxCoverageLimit = (rawLimit !== undefined && rawLimit !== null && !isNaN(Number(rawLimit)) && Number(rawLimit) > 0)
+      ? Number(rawLimit)
+      : 50000.0;
     const currency = (req.body.currency as string | undefined)?.trim() || 'INR';
 
     console.log(`[KB] Upload received: "${originalName}" (${req.file.size} bytes) | Category: ${category} | Limit: ₹${maxCoverageLimit}`);
@@ -281,7 +284,7 @@ knowledgeRouter.post(
       return;
     }
 
-    console.log(`[KB] Successfully saved ${insertedRows.length} rows for document "${documentName}".`);
+    console.log(`[KB] Successfully saved ${insertedRows.length} rows for document "${documentName}" with cap ₹${maxCoverageLimit}.`);
 
     res.status(201).json({
       success: true,
@@ -319,6 +322,8 @@ knowledgeRouter.get('/list', async (req: Request, res: Response) => {
     const docMap = new Map<string, {
       id: string;
       document_name: string;
+      category: string;
+      max_coverage_limit: number;
       file_name: string;
       uploaded_at: string;
       chunk_count: number;
@@ -333,6 +338,8 @@ knowledgeRouter.get('/list', async (req: Request, res: Response) => {
         docMap.set(docKey, {
           id: row.id,
           document_name: baseName,
+          category: row.category || 'Medical Emergency & Inpatient Care',
+          max_coverage_limit: Number(row.max_coverage_limit ?? 50000.0),
           file_name: `${baseName.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.pdf`,
           uploaded_at: row.created_at || new Date().toISOString(),
           chunk_count: 1,
