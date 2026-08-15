@@ -365,23 +365,53 @@ export const intakeWorker = new Worker(
         payoutMethod = effectiveCurrency === 'INR' ? 'RAZORPAY_INSTANT' : 'DIRECT_ACH';
         payoutReference = `TXN_MED_${Date.now()}_${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
 
-        // Deduct from Institutional Relief Fund
+        // Deduct from Institutional Relief Fund (public.health_funds and public.funds)
         try {
-          const { data: fundRows } = await supabase
-            .from('funds')
-            .select('id, fund_name, allocated_amount, total_budget')
-            .or(`fund_name.ilike.%Medical%,fund_name.ilike.%Emergency%`)
-            .limit(1);
+          const { data: allHealthFunds } = await supabase
+            .from('health_funds')
+            .select('*')
+            .eq('institution_id', instId);
 
-          if (fundRows && fundRows.length > 0) {
-            const fund = fundRows[0];
-            allocatedFundName = fund.fund_name;
+          let matchedFund = (allHealthFunds || []).find((f: any) =>
+            f.category?.toLowerCase().includes(parsedCategory.toLowerCase()) ||
+            parsedCategory.toLowerCase().includes(f.category?.toLowerCase()) ||
+            f.name?.toLowerCase().includes('emergency') ||
+            f.name?.toLowerCase().includes('copay')
+          ) || (allHealthFunds && allHealthFunds.length > 0 ? allHealthFunds[0] : null);
+
+          if (matchedFund) {
+            allocatedFundName = matchedFund.name;
+            const newDisbursed = (Number(matchedFund.total_disbursed) || 0) + approvedAmount;
             await supabase
-              .from('funds')
+              .from('health_funds')
               .update({
-                allocated_amount: (Number(fund.allocated_amount) || 0) + approvedAmount,
+                total_disbursed: newDisbursed,
               })
-              .eq('id', fund.id);
+              .eq('id', matchedFund.id);
+
+            getIO().emit('health_funds:updated', {
+              fundId: matchedFund.id,
+              institutionId: instId,
+              total_disbursed: newDisbursed,
+            });
+          } else {
+            // Fallback to funds table
+            const { data: fundRows } = await supabase
+              .from('funds')
+              .select('id, fund_name, allocated_amount, total_budget')
+              .or(`fund_name.ilike.%Medical%,fund_name.ilike.%Emergency%`)
+              .limit(1);
+
+            if (fundRows && fundRows.length > 0) {
+              const fund = fundRows[0];
+              allocatedFundName = fund.fund_name;
+              await supabase
+                .from('funds')
+                .update({
+                  allocated_amount: (Number(fund.allocated_amount) || 0) + approvedAmount,
+                })
+                .eq('id', fund.id);
+            }
           }
         } catch (fErr) {
           console.warn('[IntakeWorker] Fund allocation update notice:', fErr);

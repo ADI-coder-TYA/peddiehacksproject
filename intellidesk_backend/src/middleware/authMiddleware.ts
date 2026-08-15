@@ -30,11 +30,18 @@ export const requireAuth = (req: AuthenticatedRequest, res: Response, next: Next
     let email = emailHeader || 'user@campushealth.edu';
     let name = 'Authenticated User';
 
-    if (token.includes('admin') || roleHeader?.toUpperCase() === 'ADMIN') {
+    const normalizedRole = (roleHeader || '').toUpperCase();
+    if (
+      token.includes('admin') ||
+      normalizedRole === 'ADMIN' ||
+      normalizedRole === 'CLINICAL_DIRECTOR' ||
+      normalizedRole === 'DEAN' ||
+      normalizedRole === 'CHIEF_MEDICAL_OFFICER'
+    ) {
       role = 'ADMIN';
       email = emailHeader || 'admin@campushealth.edu';
       name = 'Chief Medical Officer';
-    } else if (token.includes('auditor') || roleHeader?.toUpperCase() === 'AUDITOR') {
+    } else if (token.includes('auditor') || normalizedRole === 'AUDITOR') {
       role = 'AUDITOR';
       email = emailHeader || 'auditor@campushealth.edu';
       name = 'Internal Auditor';
