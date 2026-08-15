@@ -170,13 +170,35 @@ export async function extractReceiptData(mediaUrl?: string | null): Promise<Pars
         extractedText = await extractTextFromPdf(buffer);
       }
     } else {
-      // Image file (PNG, JPEG, etc.) -> Tesseract OCR
-      console.log(`🖼️ [Receipt Parser] Running Tesseract OCR on image (${buffer.length} bytes)...`);
-      isScannedImage = true;
-      const worker = await createWorker('eng');
-      const ret = await worker.recognize(tempFilePath);
-      extractedText = ret.data.text || '';
-      await worker.terminate();
+      // Check if buffer is a recognized valid image format (PNG, JPG, BMP, WebP, etc.)
+      const isRecognizedImage = buffer.length >= 8 && (
+        (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) || // PNG
+        (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) || // JPEG
+        (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) || // GIF
+        (buffer[0] === 0x42 && buffer[1] === 0x4D) || // BMP
+        ((buffer[0] === 0x49 && buffer[1] === 0x49) || (buffer[0] === 0x4D && buffer[1] === 0x4D)) || // TIFF
+        (buffer.slice(0, 4).toString() === 'RIFF' && buffer.slice(8, 12).toString() === 'WEBP') // WebP
+      );
+
+      if (isRecognizedImage) {
+        try {
+          console.log(`🖼️ [Receipt Parser] Running Tesseract OCR on image (${buffer.length} bytes)...`);
+          isScannedImage = true;
+          const worker = await createWorker('eng');
+          try {
+            const ret = await worker.recognize(tempFilePath);
+            extractedText = ret.data.text || '';
+          } finally {
+            await worker.terminate().catch(() => {});
+          }
+        } catch (ocrErr: any) {
+          console.warn(`⚠️ [Receipt Parser] OCR skipped/resilient on corrupt or unreadable attachment: ${ocrErr.message}`);
+          extractedText = '';
+        }
+      } else {
+        console.warn(`⚠️ [Receipt Parser] Corrupt or unreadable attachment stream (${buffer.length} bytes) -> graceful fallback.`);
+        extractedText = '';
+      }
     }
 
     console.log(`📝 [Receipt Parser Raw Preview]:\n${extractedText.substring(0, 400)}...\n---`);

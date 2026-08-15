@@ -50,18 +50,32 @@ export async function computeImageHash(mediaUrl?: string): Promise<string | unde
  * Evaluate Emergency Fund Fraud Risk using image hashing, velocity checks, and autoencoder ML
  */
 export async function evaluateFraudRisk(
-  claimId: string,
-  patientPhone: string,
-  mediaUrl?: string,
+  claimIdOrObj: any,
+  patientPhone: string = '+910000000000',
+  mediaUrl?: string | null,
   features?: number[],
   requestedAmount?: number,
   isLifeSafetyCritical: boolean = false
 ): Promise<FraudReport> {
+  let claimId = 'claim_tmp';
+  let isLifeSafety = isLifeSafetyCritical;
+
+  if (typeof claimIdOrObj === 'object' && claimIdOrObj !== null) {
+    claimId = claimIdOrObj.claimId || claimIdOrObj.id || 'claim_tmp';
+    const desc = claimIdOrObj.description || '';
+    if (claimIdOrObj.isLifeSafety === true || /suicid|kill myself|die|urgent help/i.test(desc)) {
+      isLifeSafety = true;
+    }
+  } else if (typeof claimIdOrObj === 'string') {
+    claimId = claimIdOrObj;
+  }
+
+  const effectiveMedia = mediaUrl || undefined;
   let riskScore = 0.0;
   const flagReasons: string[] = [];
 
   // Check A: Duplicate Receipt Detection via SHA-256 Image Hash
-  const imageHash = await computeImageHash(mediaUrl);
+  const imageHash = await computeImageHash(effectiveMedia);
   if (imageHash) {
     const { data: duplicateClaims } = await supabase
       .from('claims')
@@ -88,7 +102,7 @@ export async function evaluateFraudRisk(
 
   const pastCount = recentClaims ? recentClaims.length : 0;
   if (pastCount >= 2) {
-    if (isLifeSafetyCritical) {
+    if (isLifeSafety) {
       flagReasons.push(`HIGH_DISTRESS_REPEAT_CONTACT: Patient submitted ${pastCount + 1} requests in 7 days (Crisis Escalation Active)`);
     } else {
       flagReasons.push(`PATIENT_HIGH_CLAIM_VELOCITY: Patient submitted ${pastCount + 1} claims in 7 days`);
@@ -97,7 +111,7 @@ export async function evaluateFraudRisk(
   }
 
   // Threshold Gaming: repeated micro-requests between $150 and $200 (bypass if life-safety critical)
-  if (!isLifeSafetyCritical) {
+  if (!isLifeSafety) {
     const microGrants = (recentClaims || []).filter((t: any) => {
       const amt = Number(t.extracted_bill_amount || t.recommended_copay_amount || 0);
       return amt >= 150 && amt <= 200;
@@ -119,7 +133,7 @@ export async function evaluateFraudRisk(
     if (anomalyScore >= 0.75 || isExtremePattern) {
       const displayScore = Math.max(anomalyScore, isExtremePattern ? 0.82 : 0.0);
       flagReasons.push(`ANOMALOUS_PATTERN: Autoencoder flagged suspicious feature payload (reconstruction MSE: ${displayScore.toFixed(3)})`);
-      if (!isLifeSafetyCritical) {
+      if (!isLifeSafety) {
         riskScore += 0.40;
       }
     }
