@@ -239,7 +239,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                     color: const Color(0xFF64748B),
                                   ),
                                 ),
-                                if (department != null && department.isNotEmpty) ...[
+                                if (!isStudent && department != null && department.isNotEmpty) ...[
                                   const SizedBox(height: 4),
                                   Row(
                                     children: [
@@ -247,6 +247,22 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                       const SizedBox(width: 4),
                                       Text(
                                         department,
+                                        style: GoogleFonts.outfit(
+                                          fontSize: 12,
+                                          color: const Color(0xFF64748B),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ] else if (isStudent) ...[
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.badge_outlined, size: 14, color: Color(0xFF64748B)),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Patient ID: ${user?.studentId ?? "PAT-2026"}',
                                         style: GoogleFonts.outfit(
                                           fontSize: 12,
                                           color: const Color(0xFF64748B),

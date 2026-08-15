@@ -9,7 +9,7 @@ const INSTITUTIONS: Map<string, any> = new Map();
 const STUDENT_ROSTERS: Map<string, any> = new Map(); // Key: email or phone
 const USER_STORE: Map<string, any> = new Map(); // Key: email or student_id
 
-// Seed default institution and whitelisted demo patients
+// Seed default institution
 const DEFAULT_INSTITUTION_ID = 'inst-001';
 INSTITUTIONS.set(DEFAULT_INSTITUTION_ID, {
   id: DEFAULT_INSTITUTION_ID,
@@ -20,22 +20,15 @@ INSTITUTIONS.set(DEFAULT_INSTITUTION_ID, {
 
 // Seed Whitelisted Patient Roster
 const DEFAULT_ROSTER = [
-  { student_id: 'PAT-2026-001', email: 'alex.rivera@campushealth.edu', phone: '+91 98765 43210', name: 'Alex Rivera', department: 'General Medicine & Outpatient' },
-  { student_id: 'PAT-2026-002', email: 'priya.sharma@campushealth.edu', phone: '+91 98111 22334', name: 'Priya Sharma', department: 'Pediatrics & Neonatal Care' },
-  { student_id: 'PAT-2026-003', email: 'marcus.chen@campushealth.edu', phone: '+91 98222 33445', name: 'Marcus Chen', department: 'Orthopedic & Trauma Surgery' },
-  { student_id: 'PAT-2026-004', email: 'elena.rostova@campushealth.edu', phone: '+91 98333 44556', name: 'Elena Rostova', department: 'Emergency & Acute Triage' },
-  { student_id: 'PAT-2026-005', email: 'jordan.taylor@campushealth.edu', phone: '+91 98444 55667', name: 'Jordan Taylor', department: 'Cardiology & Intensive Care' },
-  { student_id: 'PAT-2026-006', email: 'sophia.r@campushealth.edu', phone: '+91 98555 66778', name: 'Sophia Rodriguez', department: 'Neurology & Psychological Care' },
-  { student_id: 'PAT-2026-007', email: 'rohan.gupta@campushealth.edu', phone: '+91 98666 77889', name: 'Rohan Gupta', department: 'Oncology & Chemotherapy Relief' },
-  { student_id: 'PAT-2026-008', email: 'maya.lin@campushealth.edu', phone: '+91 98777 88990', name: 'Maya Lin', department: 'Pulmonology & Respiratory Care' },
+  { student_id: 'PAT-2026-001', email: 'alex.rivera@campushealth.edu', phone: '+91 98765 43210', name: 'Alex Rivera' },
+  { student_id: 'PAT-2026-002', email: 'priya.sharma@campushealth.edu', phone: '+91 98111 22334', name: 'Priya Sharma' },
+  { student_id: 'PAT-2026-003', email: 'marcus.chen@campushealth.edu', phone: '+91 98222 33445', name: 'Marcus Chen' },
+  { student_id: 'PAT-2026-004', email: 'elena.rostova@campushealth.edu', phone: '+91 98333 44556', name: 'Elena Rostova' },
+  { student_id: 'PAT-2026-005', email: 'jordan.taylor@campushealth.edu', phone: '+91 98444 55667', name: 'Jordan Taylor' },
+  { student_id: 'PAT-2026-006', email: 'sophia.r@campushealth.edu', phone: '+91 98555 66778', name: 'Sophia Rodriguez' },
+  { student_id: 'PAT-2026-007', email: 'rohan.gupta@campushealth.edu', phone: '+91 98666 77889', name: 'Rohan Gupta' },
+  { student_id: 'PAT-2026-008', email: 'maya.lin@campushealth.edu', phone: '+91 98777 88990', name: 'Maya Lin' },
 ];
-
-DEFAULT_ROSTER.forEach((r) => {
-  const entry = { ...r, institution_id: DEFAULT_INSTITUTION_ID, is_registered: false };
-  STUDENT_ROSTERS.set(r.email.toLowerCase(), entry);
-  STUDENT_ROSTERS.set(r.phone, entry);
-  STUDENT_ROSTERS.set(r.student_id.toLowerCase(), entry);
-});
 
 // Auto-seed default patients to Supabase public.patient_rosters if table is empty
 async function syncDefaultRosterToSupabase() {
@@ -469,41 +462,75 @@ router.post('/login', async (req: Request, res: Response) => {
     });
   }
 
-  // STUDENT LOGIN FLOW WITH WHITELIST VERIFICATION
-  let whitelistedEntry = STUDENT_ROSTERS.get(lookupKey);
+  // PATIENT LOGIN FLOW WITH SUPABASE ROSTER VERIFICATION
+  let whitelistedEntry: any = null;
 
-  // 1. If not found in-memory, query Supabase public.students table
-  if (!whitelistedEntry) {
-    try {
-      const { data: dbStudents } = await supabase
-        .from('students')
-        .select('*')
-        .or(`email.ilike.${lookupKey},phone.eq.${lookupKey}`);
-      
-      if (dbStudents && dbStudents.length > 0) {
-        const st = dbStudents[0];
+  // 1. Query Supabase public.patient_rosters table
+  try {
+    const { data: dbPatients } = await supabase
+      .from('patient_rosters')
+      .select('*')
+      .or(`email.ilike.${lookupKey},phone.eq.${lookupKey},patient_id.ilike.${lookupKey}`)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (dbPatients && dbPatients.length > 0) {
+      const p = dbPatients[0];
+      const pId = p.patient_id || p.id || lookupKey;
+      whitelistedEntry = {
+        id: p.id,
+        institution_id: p.institution_id || DEFAULT_INSTITUTION_ID,
+        student_id: pId,
+        patient_id: pId,
+        name: p.email ? p.email.split('@')[0].replace(/[._-]/g, ' ').split(' ').map((s: string) => s.charAt(0).toUpperCase() + s.slice(1)).join(' ') : 'Registered Patient',
+        email: p.email || lookupKey,
+        phone: p.phone || '',
+        department: null,
+        password: 'Patient@123',
+        passwordChanged: false,
+        is_registered: true,
+      };
+    }
+  } catch (dbErr) {
+    console.warn('patient_rosters lookup note:', dbErr);
+  }
+
+  // 2. Query Supabase public.profiles table for full_name / patient data
+  try {
+    const { data: dbProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .or(`email.ilike.${lookupKey},phone.eq.${lookupKey}`)
+      .maybeSingle();
+
+    if (dbProfile) {
+      if (!whitelistedEntry) {
         whitelistedEntry = {
-          id: st.id,
-          institution_id: st.institution_id || DEFAULT_INSTITUTION_ID,
-          student_id: `STU-${st.id.substring(0, 6).toUpperCase()}`,
-          name: st.name,
-          email: st.email || lookupKey,
-          phone: st.phone || '',
-          department: st.department || st.branch || 'General Academics',
-          password: 'Student@123',
+          id: dbProfile.id,
+          institution_id: dbProfile.institution_id || DEFAULT_INSTITUTION_ID,
+          student_id: `PAT-${dbProfile.id.substring(0, 6).toUpperCase()}`,
+          patient_id: `PAT-${dbProfile.id.substring(0, 6).toUpperCase()}`,
+          name: dbProfile.full_name || lookupKey.split('@')[0],
+          email: dbProfile.email || lookupKey,
+          phone: dbProfile.phone || '',
+          department: null,
+          password: 'Patient@123',
           passwordChanged: false,
           is_registered: true,
         };
-        STUDENT_ROSTERS.set(lookupKey, whitelistedEntry);
-        if (st.email) STUDENT_ROSTERS.set(st.email.toLowerCase(), whitelistedEntry);
-        if (st.phone) STUDENT_ROSTERS.set(st.phone, whitelistedEntry);
+      } else {
+        if (dbProfile.full_name) whitelistedEntry.name = dbProfile.full_name;
+        if (dbProfile.institution_id) whitelistedEntry.institution_id = dbProfile.institution_id;
       }
-    } catch (dbErr) {
-      console.warn('Database student lookup note:', dbErr);
     }
+  } catch (_) {}
+
+  // 3. Fallback to in-memory store
+  if (!whitelistedEntry) {
+    whitelistedEntry = STUDENT_ROSTERS.get(lookupKey);
   }
 
-  // 2. If student record still NOT found -> Auto-provision if valid educational email format
+  // 4. If patient record still NOT found -> Auto-provision if valid educational/email format
   if (!whitelistedEntry) {
     if (lookupKey.includes('@')) {
       const handle = lookupKey.split('@')[0];
@@ -515,34 +542,34 @@ router.post('/login', async (req: Request, res: Response) => {
 
       whitelistedEntry = {
         id: `rst_dyn_${Date.now()}`,
-        institution_id: DEFAULT_INSTITUTION_ID,
-        student_id: `STU-${Math.floor(1000 + Math.random() * 9000)}`,
-        name: derivedName || 'Student',
+        institution_id: req.body.institutionId || req.body.institution_id || DEFAULT_INSTITUTION_ID,
+        student_id: `PAT-${Math.floor(1000 + Math.random() * 9000)}`,
+        name: derivedName || 'Patient',
         email: lookupKey,
-        phone: '+1555' + Math.floor(1000000 + Math.random() * 9000000),
-        department: 'General Academics',
+        phone: '+91 98' + Math.floor(10000000 + Math.random() * 90000000),
+        department: null,
         is_registered: true,
-        password: 'Student@123',
+        password: 'Patient@123',
       };
       STUDENT_ROSTERS.set(lookupKey, whitelistedEntry);
       STUDENT_ROSTERS.set(whitelistedEntry.student_id.toLowerCase(), whitelistedEntry);
-      console.log(`✨ [Student Whitelist Engine] Dynamically registered student: ${whitelistedEntry.name} (${lookupKey})`);
+      console.log(`✨ [Patient Whitelist Engine] Dynamically registered patient: ${whitelistedEntry.name} (${lookupKey}) for ${whitelistedEntry.institution_id}`);
     } else {
-      console.warn(`⛔ [Student Whitelist Engine] Access REJECTED for '${lookupKey}' - Not found in institutional rosters.`);
+      console.warn(`⛔ [Patient Whitelist Engine] Access REJECTED for '${lookupKey}' - Not found in institutional rosters.`);
       return res.status(403).json({
         success: false,
-        error: 'Student record not found in institutional rosters. Please contact your campus administrator.',
+        error: 'Patient record not found in institutional rosters. Please contact your campus administrator.',
       });
     }
   }
 
-  // Validate student password
-  const expectedPassword = whitelistedEntry.password || 'Student@123';
-  if (password && password !== expectedPassword && password !== 'Student@123' && password !== 'password') {
-    console.warn(`⛔ [Student Auth Engine] Invalid password attempt for '${lookupKey}'`);
+  // Validate patient password
+  const expectedPassword = whitelistedEntry.password || 'Patient@123';
+  if (password && password !== expectedPassword && password !== 'Patient@123' && password !== 'Student@123' && password !== 'password') {
+    console.warn(`⛔ [Patient Auth Engine] Invalid password attempt for '${lookupKey}'`);
     return res.status(401).json({
       success: false,
-      error: 'Incorrect password. Default password is "Student@123".',
+      error: 'Incorrect password. Default password is "Patient@123".',
     });
   }
 
@@ -550,23 +577,24 @@ router.post('/login', async (req: Request, res: Response) => {
   whitelistedEntry.is_registered = true;
 
   const studentUser = {
-    id: `usr_std_${whitelistedEntry.student_id}`,
-    name: whitelistedEntry.name || lookupKey.split('@')[0] || 'Whitelisted Student',
+    id: `usr_pat_${whitelistedEntry.student_id}`,
+    name: whitelistedEntry.name || lookupKey.split('@')[0] || 'Enrolled Patient',
     email: whitelistedEntry.email || lookupKey,
     phone: whitelistedEntry.phone,
     studentId: whitelistedEntry.student_id,
-    role: 'STUDENT',
-    department: whitelistedEntry.department || 'General Academics',
+    patientId: whitelistedEntry.student_id,
+    role: 'PATIENT',
+    department: null,
     institutionId: whitelistedEntry.institution_id,
     passwordChanged: whitelistedEntry.passwordChanged ?? false,
-    token: `jwt_token_student_${whitelistedEntry.institution_id}_${whitelistedEntry.student_id}`,
+    token: `jwt_token_patient_${whitelistedEntry.institution_id}_${whitelistedEntry.student_id}`,
   };
 
-  console.log(`✅ [Student Whitelist Engine] Authenticated ${studentUser.name} (${studentUser.email}) for Institution: ${studentUser.institutionId}`);
+  console.log(`✅ [Patient Whitelist Engine] Authenticated ${studentUser.name} (${studentUser.email}) for Institution: ${studentUser.institutionId}`);
 
   return res.status(200).json({
     success: true,
-    message: 'Student authentication successful',
+    message: 'Patient authentication successful',
     token: studentUser.token,
     user: studentUser,
   });

@@ -254,17 +254,15 @@ class _PatientMainScreenState extends State<PatientMainScreen> {
                             ),
                           ],
                         ),
-                        if (user?.department != null) ...[
-                          Text(
-                            user.department,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.outfit(
-                              color: const Color(0xFF64748B),
-                              fontSize: isMobile ? 10 : 11,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        Text(
+                          '${user?.institutionId ?? ApiConfig.activeInstitutionId} • Beneficiary',
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.outfit(
+                            color: const Color(0xFF64748B),
+                            fontSize: isMobile ? 10 : 11,
+                            fontWeight: FontWeight.w500,
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   ),
