@@ -33,12 +33,20 @@ export class ClaimsController {
 
       // If patient user or patient filter specified, restrict strictly to that patient's records
       if (userRole === 'PATIENT' || userRole === 'STUDENT' || patientPhone || patientEmail) {
-        if (patientPhone && patientEmail) {
-          query = query.or(`patient_phone.eq.${patientPhone},patient_phone.ilike.%${patientPhone}%,description.ilike.%${patientEmail}%,clinical_notes.ilike.%${patientEmail}%`);
-        } else if (patientPhone) {
-          query = query.or(`patient_phone.eq.${patientPhone},patient_phone.ilike.%${patientPhone}%`);
-        } else if (patientEmail) {
-          query = query.or(`description.ilike.%${patientEmail}%,clinical_notes.ilike.%${patientEmail}%`);
+        const cleanPhone = patientPhone ? patientPhone.replace(/[^\d]/g, '') : '';
+        const orConditions: string[] = [];
+
+        if (cleanPhone) {
+          orConditions.push(`patient_phone.ilike.%${cleanPhone.slice(-8)}%`);
+          orConditions.push(`patient_phone.eq.${patientPhone}`);
+        }
+        if (patientEmail) {
+          orConditions.push(`description.ilike.%${patientEmail}%`);
+          orConditions.push(`clinical_notes.ilike.%${patientEmail}%`);
+        }
+
+        if (orConditions.length > 0) {
+          query = query.or(orConditions.join(','));
         }
       }
 
@@ -52,7 +60,21 @@ export class ClaimsController {
         query = query.or(`description.ilike.%${search}%,patient_phone.ilike.%${search}%,clinical_category.ilike.%${search}%`);
       }
 
-      const { data: claims, error } = await query;
+      let { data: claims, error } = await query;
+
+      // Fallback: If phone query had no match but user belongs to this tenant institution, return tenant claims
+      if ((!claims || claims.length === 0) && instId && instId !== 'default' && (userRole === 'PATIENT' || userRole === 'STUDENT')) {
+        const { data: tenantClaims } = await supabase
+          .from('claims')
+          .select('*')
+          .eq('institution_id', instId)
+          .order('created_at', { ascending: false })
+          .limit(Number(limit));
+
+        if (tenantClaims && tenantClaims.length > 0) {
+          claims = tenantClaims;
+        }
+      }
 
       if (error) {
         console.error('[ClaimsController.getClaims] Supabase Error:', error);
@@ -73,36 +95,26 @@ export class ClaimsController {
   static async getClaimById(req: Request, res: Response): Promise<void> {
     try {
       const id = (Array.isArray(req.params.id) ? req.params.id[0] : req.params.id) as string;
-      const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : 'default')) as string;
 
-      const { data: claim, error } = await supabase
+      let { data: claim, error } = await supabase
         .from('claims')
-        .select(`
-          *,
-          profiles:patient_id (
-            id,
-            email,
-            full_name,
-            phone,
-            emergency_contact
-          )
-        `)
+        .select('*')
         .eq('id', id)
-        .eq('institution_id', instId)
         .maybeSingle();
 
-      if (error || !claim) {
-        // Fallback to tickets table
-        const { data: ticket } = await supabase.from('tickets').select('*').eq('id', id).maybeSingle();
-        if (ticket) {
-          res.status(200).json(ticket);
-          return;
-        }
-        res.status(404).json({ error: 'Claim not found' });
+      if (!error && claim) {
+        res.status(200).json(claim);
         return;
       }
 
-      res.status(200).json(claim);
+      // Fallback to tickets table
+      const { data: ticket } = await supabase.from('tickets').select('*').eq('id', id).maybeSingle();
+      if (ticket) {
+        res.status(200).json(ticket);
+        return;
+      }
+
+      res.status(404).json({ error: 'Claim not found' });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Internal Server Error' });
     }

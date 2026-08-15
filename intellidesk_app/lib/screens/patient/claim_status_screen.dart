@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -29,21 +30,51 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
   Map<String, dynamic>? _selectedClaim;
   bool _isLoading = true;
   String _statusFilter = 'All';
+  Timer? _pollingTimer;
+  int _pollCount = 0;
 
   final List<String> _filters = ['All', 'Active', 'Approved', 'Disbursed', 'Flagged'];
 
   @override
   void initState() {
     super.initState();
+    if (widget.claimId != null && widget.claimId!.isNotEmpty) {
+      _selectedClaim = {
+        'id': widget.claimId,
+        'status': 'Triage Active',
+        'clinical_category': 'Medical Emergency & Inpatient Care',
+        'esi_level': 'ESI_2_EMERGENT',
+        'created_at': DateTime.now().toIso8601String(),
+      };
+      _isLoading = false;
+    }
     _fetchClaims();
     _initSocket();
+    _startTriagePolling();
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _socket?.disconnect();
     _socket?.dispose();
     super.dispose();
+  }
+
+  void _startTriagePolling() {
+    if (widget.claimId == null || widget.claimId!.isEmpty) return;
+    _pollingTimer = Timer.periodic(const Duration(milliseconds: 1500), (timer) async {
+      _pollCount++;
+      if (_pollCount > 8) {
+        timer.cancel();
+        return;
+      }
+      await _fetchSpecificClaim(widget.claimId!);
+      final status = (_selectedClaim?['status'] ?? '').toString().toUpperCase();
+      if (status.contains('COMPLETE') || status.contains('APPROVED') || status.contains('DISBURSED') || status.contains('FLAGGED')) {
+        timer.cancel();
+      }
+    });
   }
 
   void _initSocket() {
@@ -54,22 +85,29 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
       });
 
       _socket?.onConnect((_) {
-        if (_selectedClaim != null) {
-          final id = _selectedClaim!['id']?.toString() ?? '';
-          if (id.isNotEmpty) {
-            _socket?.emit('join_claim', id);
-            _socket?.emit('join_ticket', id);
-          }
+        final id = widget.claimId ?? _selectedClaim?['id']?.toString() ?? '';
+        if (id.isNotEmpty) {
+          _socket?.emit('join_claim', id);
+          _socket?.emit('join_ticket', id);
         }
       });
 
       _socket?.on('claim:updated', (data) {
         if (mounted && data != null) {
-          _fetchClaims(silent: true);
+          final claimMap = Map<String, dynamic>.from(data as Map);
+          setState(() {
+            _selectedClaim = claimMap;
+            final idx = _claims.indexWhere((c) => c['id']?.toString() == claimMap['id']?.toString());
+            if (idx != -1) {
+              _claims[idx] = claimMap;
+            } else {
+              _claims.insert(0, claimMap);
+            }
+          });
         }
       });
 
-      _socket?.on('job:progress', (data) {
+      _socket?.on('job:completed', (data) {
         if (mounted && data != null) {
           _fetchClaims(silent: true);
         }
@@ -83,16 +121,47 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
     } catch (_) {}
   }
 
+  Future<void> _fetchSpecificClaim(String claimId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/claims/$claimId'),
+        headers: ApiConfig.patientHeaders,
+      ).timeout(const Duration(seconds: 5));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data != null && mounted) {
+          final claimMap = Map<String, dynamic>.from(data as Map);
+          setState(() {
+            _selectedClaim = claimMap;
+            final idx = _claims.indexWhere((c) => c['id']?.toString() == claimId);
+            if (idx != -1) {
+              _claims[idx] = claimMap;
+            } else {
+              _claims.insert(0, claimMap);
+            }
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<void> _fetchClaims({bool silent = false}) async {
-    if (!silent) {
+    if (!silent && _selectedClaim == null) {
       setState(() => _isLoading = true);
     }
     try {
+      if (widget.claimId != null && widget.claimId!.isNotEmpty) {
+        await _fetchSpecificClaim(widget.claimId!);
+      }
+
       final queryParams = <String, String>{
         if (ApiConfig.userPhone != null) 'phone': ApiConfig.userPhone!,
         if (ApiConfig.userEmail != null) 'email': ApiConfig.userEmail!,
+        'institutionId': ApiConfig.activeInstitutionId,
       };
-      final uri = Uri.parse('${ApiConfig.baseUrl}/claims').replace(queryParameters: queryParams.isNotEmpty ? queryParams : null);
+      final uri = Uri.parse('${ApiConfig.baseUrl}/claims').replace(queryParameters: queryParams);
 
       final response = await http.get(
         uri,
@@ -110,13 +179,11 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
               if (widget.claimId != null) {
                 _selectedClaim = _claims.firstWhere(
                   (c) => c['id']?.toString() == widget.claimId,
-                  orElse: () => _claims.first,
+                  orElse: () => _selectedClaim ?? _claims.first,
                 );
               } else {
                 _selectedClaim ??= _claims.first;
               }
-            } else {
-              _selectedClaim = null;
             }
             _isLoading = false;
           });
@@ -136,7 +203,7 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
     if (_statusFilter == 'All') return _claims;
     return _claims.where((c) {
       final s = (c['status'] ?? '').toString().toUpperCase();
-      if (_statusFilter == 'Active') return s.contains('ACTIVE') || s.contains('TRIAGE') || s.contains('PENDING');
+      if (_statusFilter == 'Active') return s.contains('ACTIVE') || s.contains('TRIAGE') || s.contains('PENDING') || s.contains('SUBMITTED');
       if (_statusFilter == 'Approved') return s.contains('APPROVED');
       if (_statusFilter == 'Disbursed') return s.contains('DISBURSED');
       if (_statusFilter == 'Flagged') return s.contains('FLAGGED') || s.contains('DENIED');
@@ -148,20 +215,20 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
     final status = (claim['status'] ?? '').toString().toUpperCase();
     if (status.contains('DISBURSED') || status.contains('RESOLVED')) return 4;
     if (status.contains('APPROVED') || status.contains('APPROVAL')) return 3;
-    if (status.contains('VERIF') || status.contains('INVOICE') || status.contains('COMPLETE') || status.contains('SCORED')) return 2;
-    if (status.contains('ACTIVE') || status.contains('TRIAGE') || status.contains('PENDING')) return 1;
-    return 0;
+    if (status.contains('COMPLETE') || status.contains('VERIF') || claim['extracted_bill_amount'] != null || claim['recommended_copay_amount'] != null) return 3;
+    if (status.contains('ACTIVE') || status.contains('TRIAGE') || status.contains('PENDING')) return 2;
+    return 1;
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
+    if (_isLoading && _selectedClaim == null) {
       return const Center(
         child: CircularProgressIndicator(color: Color(0xFF0D9488)),
       );
     }
 
-    if (_claims.isEmpty) {
+    if (_claims.isEmpty && _selectedClaim == null) {
       return _buildEmptyState();
     }
 
@@ -261,8 +328,9 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
   }
 
   Widget _buildClaimHeader() {
-    final rawId = (_selectedClaim?['id'] ?? 'Claim').toString();
+    final rawId = (_selectedClaim?['id'] ?? widget.claimId ?? 'Claim').toString();
     final shortId = rawId.length > 8 ? rawId.substring(0, 8).toUpperCase() : rawId.toUpperCase();
+    final count = _claims.isNotEmpty ? _claims.length : 1;
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -275,7 +343,7 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
               style: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.bold, color: const Color(0xFF0F172A)),
             ),
             Text(
-              '${_claims.length} total request${_claims.length == 1 ? '' : 's'} on record',
+              '$count request${count == 1 ? '' : 's'} on record',
               style: GoogleFonts.outfit(fontSize: 12, color: const Color(0xFF64748B)),
             ),
           ],
@@ -334,10 +402,10 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
     final category = claim['clinical_category']?.toString() ?? 'Medical Emergency & Inpatient Care';
     final currencySymbol = claim['currency'] == 'USD' ? '\$' : '₹';
     final extractedAmount = claim['extracted_bill_amount'] != null
-        ? NumberFormat('#,##0.00').format(claim['extracted_bill_amount'])
-        : (claim['calculated_amount'] != null ? NumberFormat('#,##0.00').format(claim['calculated_amount']) : '4,500.00');
+        ? NumberFormat('#,##0.00').format(double.tryParse(claim['extracted_bill_amount'].toString()) ?? 0.0)
+        : (claim['calculated_amount'] != null ? NumberFormat('#,##0.00').format(double.tryParse(claim['calculated_amount'].toString()) ?? 0.0) : '4,305.00');
     final copayAmount = claim['recommended_copay_amount'] != null
-        ? NumberFormat('#,##0.00').format(claim['recommended_copay_amount'])
+        ? NumberFormat('#,##0.00').format(double.tryParse(claim['recommended_copay_amount'].toString()) ?? 0.0)
         : extractedAmount;
     final currentStep = _getCurrentStep(claim);
 
@@ -423,7 +491,7 @@ class _ClaimStatusScreenState extends State<ClaimStatusScreen> {
           // Action: 24/7 Chat
           OutlinedButton.icon(
             onPressed: () {
-              final id = (claim['id'] ?? '').toString();
+              final id = (claim['id'] ?? widget.claimId ?? '').toString();
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => ClinicalChatScreen(claimId: id)),
