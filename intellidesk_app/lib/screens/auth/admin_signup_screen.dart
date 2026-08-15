@@ -26,7 +26,6 @@ class _AdminSignupScreenState extends State<AdminSignupScreen> {
   final TextEditingController _specialtyCtrl = TextEditingController();
   final TextEditingController _phoneCtrl = TextEditingController();
   final TextEditingController _defaultStudentPasswordCtrl = TextEditingController();
-  final TextEditingController _fundPoolCtrl = TextEditingController();
 
   final TextEditingController _csvRawCtrl = TextEditingController();
   List<Map<String, String>> _parsedStudents = [];
@@ -53,7 +52,6 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
     _specialtyCtrl.dispose();
     _phoneCtrl.dispose();
     _defaultStudentPasswordCtrl.dispose();
-    _fundPoolCtrl.dispose();
     _csvRawCtrl.dispose();
     super.dispose();
   }
@@ -164,7 +162,6 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
       institutionCode: _instCodeCtrl.text.trim(),
       department: _specialtyCtrl.text.trim(),
       phone: _phoneCtrl.text.trim(),
-      initialFundPool: double.tryParse(_fundPoolCtrl.text.trim()) ?? 150000.0,
       defaultStudentPassword: _defaultStudentPasswordCtrl.text.trim(),
       rosterStudents: _parsedStudents,
     );
@@ -230,7 +227,6 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                   Text('• Facility ID: ${_instCodeCtrl.text.trim()}', style: const TextStyle(fontSize: 12)),
                   Text('• Clinical Admin: ${_adminEmailCtrl.text.trim()}', style: const TextStyle(fontSize: 12)),
                   Text('• Provisioned Patients: ${_parsedStudents.length}', style: const TextStyle(fontSize: 12)),
-                  Text('• Health Fund Pool: ₹${_fundPoolCtrl.text.trim()}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primaryBrand)),
                 ],
               ),
             ),
@@ -399,13 +395,6 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                     decoration: _buildInputDeco('Default Patient Password (for CSV roster)', Icons.key, hintText: 'e.g. Patient@123'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
-                                  const SizedBox(height: 12),
-                                  TextFormField(
-                                    controller: _fundPoolCtrl,
-                                    keyboardType: TextInputType.number,
-                                    decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined, hintText: 'e.g. 150000'),
-                                    validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                                  ),
                                 ],
                               );
                             }
@@ -496,19 +485,6 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                       child: TextFormField(
                                         controller: _defaultStudentPasswordCtrl,
                                         decoration: _buildInputDeco('Default Patient Password', Icons.key, hintText: 'e.g. Patient@123'),
-                                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: TextFormField(
-                                        controller: _fundPoolCtrl,
-                                        keyboardType: TextInputType.number,
-                                        decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined, hintText: 'e.g. 150000'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
