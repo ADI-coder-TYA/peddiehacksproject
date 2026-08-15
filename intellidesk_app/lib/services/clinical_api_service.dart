@@ -37,7 +37,7 @@ class ClinicalApiService {
       }),
     );
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
+    if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 202) {
       return jsonDecode(response.body) as Map<String, dynamic>;
     }
     throw Exception('Failed to submit claim (${response.statusCode}): ${response.body}');

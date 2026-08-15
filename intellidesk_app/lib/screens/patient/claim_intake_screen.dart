@@ -96,7 +96,7 @@ class _ClaimIntakeScreenState extends State<ClaimIntakeScreen> {
         body: jsonEncode(payload),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 202) {
         final resData = jsonDecode(response.body);
         final claimId = resData['ticketId'] ?? resData['claimId'] ?? resData['id'];
 
