@@ -251,7 +251,7 @@ router.get('/audit-logs', async (req: Request, res: Response) => {
   try {
     const { action_type, start_date, end_date, limit = 50, offset = 0 } = req.query;
 
-    const instId = typeof req.institution_id === 'string' ? req.institution_id : 'edu-admin-123';
+    const instId = (typeof req.institution_id === 'string' ? req.institution_id : (Array.isArray(req.institution_id) ? req.institution_id[0] : (req.headers['x-institution-id'] as string) || (req.query.institutionId as string) || 'inst-001')) as string;
 
     let query = supabase
       .from('audit_logs')
