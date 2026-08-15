@@ -16,8 +16,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final TextEditingController _emailCtrl = TextEditingController(text: 'alex.j@university.edu');
-  final TextEditingController _passwordCtrl = TextEditingController(text: 'password123');
+  final TextEditingController _emailCtrl = TextEditingController();
+  final TextEditingController _passwordCtrl = TextEditingController();
   bool _obscurePassword = true;
   final _formKey = GlobalKey<FormState>();
 
@@ -30,11 +30,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   void _onTabChanged() {
     if (_tabController.indexIsChanging) return;
-    if (_tabController.index == 0) {
-      _emailCtrl.text = 'alex.j@university.edu';
-    } else {
-      _emailCtrl.text = 's.chen@university.edu';
-    }
+    setState(() {});
   }
 
   @override
@@ -178,8 +174,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   controller: _emailCtrl,
                                   keyboardType: TextInputType.emailAddress,
                                   decoration: InputDecoration(
-                                    labelText: 'Email Address / Patient ID',
-                                    hintText: 'patient@university.edu',
+                                    labelText: _tabController.index == 0 ? 'Patient Phone or Email' : 'Official Medical Email',
+                                    hintText: _tabController.index == 0 ? 'e.g. +91 98765 43210 or patient@hospital.org' : 'e.g. admin@campushealth.edu',
+                                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                                     prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFF0D9488)),
                                     filled: true,
                                     fillColor: Colors.white.withValues(alpha: 0.8),
@@ -205,6 +202,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   obscureText: _obscurePassword,
                                   decoration: InputDecoration(
                                     labelText: 'Password',
+                                    hintText: 'Enter your account password',
+                                    hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
                                     prefixIcon: const Icon(Icons.lock_outline, color: Color(0xFF0D9488)),
                                     suffixIcon: IconButton(
                                       icon: Icon(

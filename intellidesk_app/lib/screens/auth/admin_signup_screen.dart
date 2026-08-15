@@ -18,19 +18,20 @@ class AdminSignupScreen extends StatefulWidget {
 class _AdminSignupScreenState extends State<AdminSignupScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final TextEditingController _instituteNameCtrl = TextEditingController(text: 'Apex Health & Medical Center');
-  final TextEditingController _adminNameCtrl = TextEditingController(text: 'Dr. Sarah Chen, MD');
-  final TextEditingController _adminEmailCtrl = TextEditingController(text: 'admin@campushealth.edu');
-  final TextEditingController _passwordCtrl = TextEditingController(text: 'admin123');
-  final TextEditingController _instCodeCtrl = TextEditingController(text: 'inst-001');
-  final TextEditingController _specialtyCtrl = TextEditingController(text: 'Emergency Medicine & Chief Medical Officer');
-  final TextEditingController _phoneCtrl = TextEditingController(text: '+91 98111 22334');
-  final TextEditingController _defaultStudentPasswordCtrl = TextEditingController(text: 'Patient@123');
-  final TextEditingController _fundPoolCtrl = TextEditingController(text: '150000');
+  final TextEditingController _instituteNameCtrl = TextEditingController();
+  final TextEditingController _adminNameCtrl = TextEditingController();
+  final TextEditingController _adminEmailCtrl = TextEditingController();
+  final TextEditingController _passwordCtrl = TextEditingController();
+  final TextEditingController _instCodeCtrl = TextEditingController();
+  final TextEditingController _specialtyCtrl = TextEditingController();
+  final TextEditingController _phoneCtrl = TextEditingController();
+  final TextEditingController _defaultStudentPasswordCtrl = TextEditingController();
+  final TextEditingController _fundPoolCtrl = TextEditingController();
 
   final TextEditingController _csvRawCtrl = TextEditingController();
   List<Map<String, String>> _parsedStudents = [];
   String? _csvFileName;
+  bool _obscurePassword = true;
 
   static const String sampleCsvTemplate = '''id,institution_id,phone,name,email,emergency_contact
 PAT-2026-001,inst-001,+91 98765 43210,Alex Rivera,alex.rivera@campushealth.edu,+91 98765 43211
@@ -40,9 +41,6 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
   @override
   void initState() {
     super.initState();
-    // Load sample patient CSV data by default
-    _csvRawCtrl.text = sampleCsvTemplate;
-    _parseCsvText(sampleCsvTemplate);
   }
 
   @override
@@ -345,52 +343,67 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                 children: [
                                   TextFormField(
                                     controller: _instituteNameCtrl,
-                                    decoration: _buildInputDeco('Healthcare Facility Name', Icons.local_hospital_outlined),
+                                    decoration: _buildInputDeco('Healthcare Facility Name', Icons.local_hospital_outlined, hintText: 'e.g. Apex Health & Medical Center'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _instCodeCtrl,
-                                    decoration: _buildInputDeco('Facility Code / ID', Icons.tag),
+                                    decoration: _buildInputDeco('Facility Code / ID', Icons.tag, hintText: 'e.g. inst-001 or metro-health'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _adminNameCtrl,
-                                    decoration: _buildInputDeco('Chief Medical Officer / Admin Name', Icons.person_outline),
+                                    decoration: _buildInputDeco('Chief Medical Officer / Admin Name', Icons.person_outline, hintText: 'e.g. Dr. Sarah Chen, MD'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _specialtyCtrl,
-                                    decoration: _buildInputDeco('Clinical Specialty & Department', Icons.medical_services_outlined),
+                                    decoration: _buildInputDeco('Clinical Specialty & Department', Icons.medical_services_outlined, hintText: 'e.g. Emergency Medicine & Trauma Care'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _adminEmailCtrl,
                                     keyboardType: TextInputType.emailAddress,
-                                    decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined),
+                                    decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined, hintText: 'e.g. admin@campushealth.edu'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _phoneCtrl,
                                     keyboardType: TextInputType.phone,
-                                    decoration: _buildInputDeco('Official Admin Phone', Icons.phone_outlined),
+                                    decoration: _buildInputDeco('Official Admin Phone', Icons.phone_outlined, hintText: 'e.g. +91 98111 22334'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
+                                    controller: _passwordCtrl,
+                                    obscureText: _obscurePassword,
+                                    decoration: _buildInputDeco(
+                                      'Admin Password',
+                                      Icons.lock_outline,
+                                      hintText: 'Enter secure admin password (min 6 chars)',
+                                      suffixIcon: IconButton(
+                                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF94A3B8), size: 18),
+                                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                      ),
+                                    ),
+                                    validator: (v) => v == null || v.length < 6 ? 'Min 6 characters' : null,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  TextFormField(
                                     controller: _defaultStudentPasswordCtrl,
-                                    decoration: _buildInputDeco('Default Patient Password (for CSV roster)', Icons.key),
+                                    decoration: _buildInputDeco('Default Patient Password (for CSV roster)', Icons.key, hintText: 'e.g. Patient@123'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                   const SizedBox(height: 12),
                                   TextFormField(
                                     controller: _fundPoolCtrl,
                                     keyboardType: TextInputType.number,
-                                    decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined),
+                                    decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined, hintText: 'e.g. 150000'),
                                     validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                   ),
                                 ],
@@ -403,7 +416,7 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                     Expanded(
                                       child: TextFormField(
                                         controller: _instituteNameCtrl,
-                                        decoration: _buildInputDeco('Healthcare Facility Name', Icons.local_hospital_outlined),
+                                        decoration: _buildInputDeco('Healthcare Facility Name', Icons.local_hospital_outlined, hintText: 'e.g. Apex Health & Medical Center'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -411,7 +424,7 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                     Expanded(
                                       child: TextFormField(
                                         controller: _instCodeCtrl,
-                                        decoration: _buildInputDeco('Facility Code / ID', Icons.tag),
+                                        decoration: _buildInputDeco('Facility Code / ID', Icons.tag, hintText: 'e.g. inst-001 or metro-health'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -423,7 +436,7 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                     Expanded(
                                       child: TextFormField(
                                         controller: _adminNameCtrl,
-                                        decoration: _buildInputDeco('CMO / Admin Full Name', Icons.person_outline),
+                                        decoration: _buildInputDeco('CMO / Admin Full Name', Icons.person_outline, hintText: 'e.g. Dr. Sarah Chen, MD'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -431,7 +444,7 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                     Expanded(
                                       child: TextFormField(
                                         controller: _specialtyCtrl,
-                                        decoration: _buildInputDeco('Clinical Specialty & Department', Icons.medical_services_outlined),
+                                        decoration: _buildInputDeco('Clinical Specialty & Department', Icons.medical_services_outlined, hintText: 'e.g. Emergency Medicine & Trauma Care'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -444,7 +457,7 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                       child: TextFormField(
                                         controller: _adminEmailCtrl,
                                         keyboardType: TextInputType.emailAddress,
-                                        decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined),
+                                        decoration: _buildInputDeco('Official Medical Email', Icons.email_outlined, hintText: 'e.g. admin@campushealth.edu'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -453,7 +466,7 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                       child: TextFormField(
                                         controller: _phoneCtrl,
                                         keyboardType: TextInputType.phone,
-                                        decoration: _buildInputDeco('Official Admin Phone', Icons.phone_outlined),
+                                        decoration: _buildInputDeco('Official Admin Phone', Icons.phone_outlined, hintText: 'e.g. +91 98111 22334'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -464,17 +477,38 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
                                   children: [
                                     Expanded(
                                       child: TextFormField(
-                                        controller: _defaultStudentPasswordCtrl,
-                                        decoration: _buildInputDeco('Default Patient Password', Icons.key),
-                                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                        controller: _passwordCtrl,
+                                        obscureText: _obscurePassword,
+                                        decoration: _buildInputDeco(
+                                          'Admin Password',
+                                          Icons.lock_outline,
+                                          hintText: 'Enter secure password (min 6 chars)',
+                                          suffixIcon: IconButton(
+                                            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility, color: const Color(0xFF94A3B8), size: 18),
+                                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                                          ),
+                                        ),
+                                        validator: (v) => v == null || v.length < 6 ? 'Min 6 characters' : null,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
                                       child: TextFormField(
+                                        controller: _defaultStudentPasswordCtrl,
+                                        decoration: _buildInputDeco('Default Patient Password', Icons.key, hintText: 'e.g. Patient@123'),
+                                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
                                         controller: _fundPoolCtrl,
                                         keyboardType: TextInputType.number,
-                                        decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined),
+                                        decoration: _buildInputDeco('Initial Health Fund Pool (₹)', Icons.account_balance_wallet_outlined, hintText: 'e.g. 150000'),
                                         validator: (v) => v == null || v.isEmpty ? 'Required' : null,
                                       ),
                                     ),
@@ -683,11 +717,14 @@ PAT-2026-003,inst-001,+91 99223 34455,Taylor Chen,taylor.chen@campushealth.edu,+
     );
   }
 
-  InputDecoration _buildInputDeco(String label, IconData icon) {
+  InputDecoration _buildInputDeco(String label, IconData icon, {String? hintText, Widget? suffixIcon}) {
     return InputDecoration(
       labelText: label,
+      hintText: hintText,
+      hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
       labelStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
       prefixIcon: Icon(icon, color: AppTheme.primaryBrand, size: 20),
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: Colors.white.withValues(alpha: 0.8),
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0x1A1F1B2C))),
