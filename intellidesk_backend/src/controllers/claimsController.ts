@@ -28,7 +28,11 @@ export class ClaimsController {
         .limit(Number(limit));
 
       if (instId && instId !== 'default' && instId !== 'all') {
-        query = query.eq('institution_id', instId);
+        if (instId === 'inst-001') {
+          query = query.or('institution_id.eq.inst-001,institution_id.eq.nano123,institution_id.is.null');
+        } else {
+          query = query.eq('institution_id', instId);
+        }
       }
 
       // If patient user or patient filter specified, restrict strictly to that patient's records

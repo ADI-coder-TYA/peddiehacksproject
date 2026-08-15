@@ -128,6 +128,56 @@ class AuditLogItem {
       checksum: hashDigest,
     );
   }
+
+  factory AuditLogItem.fromAuditMap(Map<String, dynamic> a) {
+    final details = a['details'] is Map<String, dynamic>
+        ? a['details'] as Map<String, dynamic>
+        : (a['details'] is String ? (jsonDecode(a['details']) as Map<String, dynamic>?) ?? {} : <String, dynamic>{});
+    
+    final String auditId = a['id']?.toString() ?? 'AUD-001';
+    final String claimId = a['entity_id']?.toString() ?? details['ticket_id']?.toString() ?? details['claimId']?.toString() ?? auditId;
+    final String action = a['action']?.toString() ?? a['action_type']?.toString() ?? 'CLAIM_AUDIT';
+    final String actor = a['performed_by']?.toString() ?? 'AI_AGENT';
+    final String status = details['status']?.toString() ?? (action.contains('DISBURSE') || action.contains('AUTO') ? 'Disbursed' : (action.contains('FLAG') ? 'Flagged' : 'Approved'));
+    
+    final double requestedAmt = (num.tryParse(details['requested_amount']?.toString() ?? details['amount']?.toString() ?? '0') ?? 0.0).toDouble();
+    final double disbursedAmt = (num.tryParse(details['disbursed_amount']?.toString() ?? details['amount']?.toString() ?? '0') ?? 0.0).toDouble();
+    final double fraudScore = (num.tryParse(details['fraud_risk_score']?.toString() ?? '0') ?? 0.0).toDouble();
+    final double csi = (num.tryParse(details['csi_score']?.toString() ?? details['crisis_severity_index']?.toString() ?? '0') ?? 0.4).toDouble();
+
+    DateTime parsedTime = DateTime.now();
+    if (a['created_at'] != null) {
+      parsedTime = DateTime.tryParse(a['created_at'].toString()) ?? DateTime.now();
+    }
+
+    final rawPayload = '$claimId|$action|$disbursedAmt|${a['institution_id'] ?? 'inst-001'}|$parsedTime';
+    final hashDigest = details['checksum']?.toString() ?? crypto.sha256.convert(utf8.encode(rawPayload)).toString();
+
+    return AuditLogItem(
+      id: auditId.length > 8 ? auditId.substring(0, 8) : auditId,
+      timestamp: parsedTime,
+      ticketId: claimId,
+      actorType: actor.toUpperCase().contains('AI') ? 'AI_AGENT' : 'ADMIN_USER',
+      actorName: actor,
+      actionType: action,
+      institutionId: a['institution_id']?.toString() ?? 'inst-001',
+      clinicalCategory: details['clinical_category']?.toString() ?? 'Medical Emergency & Inpatient Care',
+      description: details['description']?.toString() ?? 'Emergency copay relief transaction',
+      patientPhone: details['patient_phone']?.toString() ?? '+91 9988776655',
+      policyContext: details['policy_context']?.toString() ?? 'Institutional Emergency Copay Policy Clause 4B',
+      thoughtProcess: details['thought_process']?.toString() ?? 'Cryptographic adjudication verified. ESI triage parameters match policy bounds.',
+      requestedAmount: requestedAmt > 0 ? requestedAmt : disbursedAmt,
+      disbursedAmount: disbursedAmt,
+      currency: details['currency']?.toString() ?? 'INR',
+      esiLevel: details['esi_level']?.toString() ?? 'ESI_3_URGENT',
+      crisisSeverityIndex: csi,
+      fraudRiskScore: fraudScore,
+      payoutReference: details['payout_reference']?.toString() ?? (disbursedAmt > 0 ? 'pout_${claimId.hashCode.abs().toRadixString(36)}' : null),
+      payoutMethod: details['payout_method']?.toString() ?? 'RAZORPAY_UPI',
+      status: status,
+      checksum: hashDigest,
+    );
+  }
 }
 
 // ============================================================================
@@ -163,24 +213,45 @@ class _AdminComplianceAuditScreenState extends State<AdminComplianceAuditScreen>
   Future<void> _fetchAuditTrail() async {
     setState(() => _isLoading = true);
     try {
-      final res = await http.get(
-        Uri.parse('${ApiConfig.baseUrl}/claims'),
+      // 1. Fetch from /admin/audit-logs
+      final auditRes = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/admin/audit-logs?limit=100'),
         headers: ApiConfig.adminHeaders,
       );
 
-      if (res.statusCode == 200) {
-        final List claimsJson = jsonDecode(res.body);
+      if (auditRes.statusCode == 200) {
+        final List auditJson = jsonDecode(auditRes.body);
+        if (auditJson.isNotEmpty) {
+          final logs = auditJson.map((a) => AuditLogItem.fromAuditMap(Map<String, dynamic>.from(a))).toList();
+          if (mounted) {
+            setState(() {
+              _allLogs = logs;
+              _isLoading = false;
+            });
+            return;
+          }
+        }
+      }
+
+      // 2. Fallback to /claims
+      final claimsRes = await http.get(
+        Uri.parse('${ApiConfig.baseUrl}/claims?limit=100'),
+        headers: ApiConfig.adminHeaders,
+      );
+
+      if (claimsRes.statusCode == 200) {
+        final List claimsJson = jsonDecode(claimsRes.body);
         final logs = claimsJson.map((c) => AuditLogItem.fromClaimMap(Map<String, dynamic>.from(c))).toList();
         if (mounted) {
           setState(() {
             _allLogs = logs;
             _isLoading = false;
           });
+          return;
         }
-        return;
       }
     } catch (e) {
-      debugPrint('[ComplianceAudit] Error fetching claims: $e');
+      debugPrint('[ComplianceAudit] Error fetching audit trail: $e');
     }
 
     if (mounted) setState(() => _isLoading = false);

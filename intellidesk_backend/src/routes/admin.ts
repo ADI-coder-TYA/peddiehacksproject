@@ -256,8 +256,15 @@ router.get('/audit-logs', async (req: Request, res: Response) => {
     let query = supabase
       .from('audit_logs')
       .select('*')
-      .eq('institution_id', instId)
       .order('created_at', { ascending: false });
+
+    if (instId && instId !== 'default' && instId !== 'all') {
+      if (instId === 'inst-001') {
+        query = query.or('institution_id.eq.inst-001,institution_id.eq.nano123,institution_id.is.null');
+      } else {
+        query = query.eq('institution_id', instId);
+      }
+    }
 
     if (action_type) {
       query = query.eq('action_type', action_type as string);
